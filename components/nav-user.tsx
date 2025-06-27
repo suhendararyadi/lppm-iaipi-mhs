@@ -1,5 +1,9 @@
 "use client"
 
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { pb } from '@/lib/pocketbase';
+import { RecordModel } from 'pocketbase';
 import {
   IconCreditCard,
   IconDotsVertical,
@@ -29,16 +33,39 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
-export function NavUser({
-  user,
-}: {
-  user: {
-    name: string
-    email: string
-    avatar: string
+export function NavUser() {
+  const { isMobile } = useSidebar();
+  const router = useRouter();
+  const [user, setUser] = useState<RecordModel | null>(null);
+
+  useEffect(() => {
+    // Ambil data pengguna dari authStore saat komponen dimuat
+    if (pb.authStore.isValid) {
+      setUser(pb.authStore.model);
+    }
+  }, []);
+
+  const handleLogout = () => {
+    pb.authStore.clear(); // Hapus sesi dari PocketBase
+    router.push('/login'); // Arahkan ke halaman login
+  };
+
+  if (!user) {
+    // Tampilkan placeholder jika data pengguna belum termuat
+    return (
+        <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton size="lg" className="animate-pulse">
+                    <Avatar className="h-8 w-8 rounded-lg bg-muted"></Avatar>
+                    <div className="grid flex-1 gap-2 text-left text-sm leading-tight">
+                        <div className="h-4 w-24 rounded-md bg-muted"></div>
+                        <div className="h-3 w-32 rounded-md bg-muted"></div>
+                    </div>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        </SidebarMenu>
+    );
   }
-}) {
-  const { isMobile } = useSidebar()
 
   return (
     <SidebarMenu>
@@ -49,12 +76,14 @@ export function NavUser({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <Avatar className="h-8 w-8 rounded-lg grayscale">
-                <AvatarImage src={user.avatar} alt={user.name} />
-                <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+              <Avatar className="h-8 w-8 rounded-lg">
+                <AvatarImage src={user.avatar ? pb.getFileUrl(user, user.avatar) : ''} alt={user.nama_lengkap || 'Pengguna'} />
+                <AvatarFallback className="rounded-lg bg-primary text-primary-foreground">
+                    {user.nama_lengkap?.charAt(0).toUpperCase() || 'U'}
+                </AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-medium">{user.name}</span>
+                <span className="truncate font-medium">{user.nama_lengkap || 'Pengguna'}</span>
                 <span className="text-muted-foreground truncate text-xs">
                   {user.email}
                 </span>
@@ -71,11 +100,13 @@ export function NavUser({
             <DropdownMenuLabel className="p-0 font-normal">
               <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                 <Avatar className="h-8 w-8 rounded-lg">
-                  <AvatarImage src={user.avatar} alt={user.name} />
-                  <AvatarFallback className="rounded-lg">CN</AvatarFallback>
+                   <AvatarImage src={user.avatar ? pb.getFileUrl(user, user.avatar) : ''} alt={user.nama_lengkap || 'Pengguna'} />
+                   <AvatarFallback className="rounded-lg bg-primary text-primary-foreground">
+                       {user.nama_lengkap?.charAt(0).toUpperCase() || 'U'}
+                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">{user.name}</span>
+                  <span className="truncate font-medium">{user.nama_lengkap || 'Pengguna'}</span>
                   <span className="text-muted-foreground truncate text-xs">
                     {user.email}
                   </span>
@@ -84,23 +115,25 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              {/* Menu dinonaktifkan untuk sementara */}
+              <DropdownMenuItem disabled>
                 <IconUserCircle />
-                Account
+                Profil Saya
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled>
                 <IconCreditCard />
-                Billing
+                Tagihan
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem disabled>
                 <IconNotification />
-                Notifications
+                Notifikasi
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            {/* Fungsi Logout */}
+            <DropdownMenuItem onClick={handleLogout}>
               <IconLogout />
-              Log out
+              Keluar
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

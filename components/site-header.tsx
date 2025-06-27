@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { IconBook } from "@tabler/icons-react"
 
 export function SiteHeader() {
   return (
@@ -11,11 +12,16 @@ export function SiteHeader() {
           orientation="vertical"
           className="mx-2 data-[orientation=vertical]:h-4"
         />
-        <h1 className="text-base font-medium">Documents</h1>
+        {/* Judul telah diubah */}
+        <div className="flex items-center gap-2">
+            <IconBook className="h-5 w-5 text-muted-foreground" />
+            <h1 className="text-base font-semibold">Laporan Penelitian Mahasiswa</h1>
+        </div>
         <div className="ml-auto flex items-center gap-2">
+          {/* Tombol GitHub bisa Anda hapus jika tidak diperlukan */}
           <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
             <a
-              href="https://github.com/shadcn-ui/ui/tree/main/apps/v4/app/(examples)/dashboard"
+              href="https://github.com/suhendararyadi/lppm-iaipi-mhs"
               rel="noopener noreferrer"
               target="_blank"
               className="dark:text-foreground"

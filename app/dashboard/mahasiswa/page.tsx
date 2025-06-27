@@ -3,7 +3,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { pb } from '@/lib/pocketbase';
-import { RecordModel } from 'pocketbase';
+import { RecordModel, ClientResponseError } from 'pocketbase';
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { IconUserPlus, IconTrash, IconUser } from '@tabler/icons-react';
+import { IconUserPlus, IconTrash, IconUsers } from '@tabler/icons-react';
 import { toast } from "sonner";
 
 // Definisikan tipe untuk anggota
@@ -22,6 +22,9 @@ interface Anggota {
   nim: string;
   prodi: string;
 }
+
+// Tipe untuk data anggota yang disimpan di PocketBase (tanpa id sementara)
+type AnggotaData = Omit<Anggota, 'id'>;
 
 export default function MahasiswaDashboardPage() {
   const router = useRouter();
@@ -47,10 +50,10 @@ export default function MahasiswaDashboardPage() {
         const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`);
         setKelompok(kelompokRecord);
         // Inisialisasi anggota dari data yang ada, tambahkan ID unik
-        setAnggota(kelompokRecord.anggota?.map((a: any) => ({ ...a, id: crypto.randomUUID() })) || []);
-      } catch (error) {
+        setAnggota(kelompokRecord.anggota?.map((a: AnggotaData) => ({ ...a, id: crypto.randomUUID() })) || []);
+      } catch (error: unknown) {
         // Jika tidak ada, buat record kelompok baru untuk user ini
-        if (error.status === 404) {
+        if (error instanceof ClientResponseError && error.status === 404) {
           try {
             const newKelompok = await pb.collection('kelompok_mahasiswa').create({
               ketua: user.id,
@@ -83,7 +86,7 @@ export default function MahasiswaDashboardPage() {
     
     try {
       await pb.collection('kelompok_mahasiswa').update(kelompok.id, {
-        anggota: updatedAnggotaList.map(({ id, ...rest }) => rest), // Simpan tanpa ID sementara
+        anggota: updatedAnggotaList.map(({ id: _, ...rest }) => rest), // Simpan tanpa ID sementara, abaikan 'id'
       });
       setAnggota(updatedAnggotaList);
       toast.success("Anggota berhasil ditambahkan!");
@@ -104,7 +107,7 @@ export default function MahasiswaDashboardPage() {
 
     try {
       await pb.collection('kelompok_mahasiswa').update(kelompok.id, {
-        anggota: updatedAnggotaList.map(({ id, ...rest }) => rest), // Simpan tanpa ID sementara
+        anggota: updatedAnggotaList.map(({ id: _, ...rest }) => rest), // Simpan tanpa ID sementara, abaikan 'id'
       });
       setAnggota(updatedAnggotaList);
       toast.success("Anggota berhasil dihapus.");
