@@ -3,8 +3,8 @@
 import * as React from "react"
 import { pb } from "@/lib/pocketbase";
 import {
-  IconLayoutDashboard, IconFileText, IconUsers, IconSettings, IconHelp,
-  IconBuildingCommunity, IconFileCheck, IconHistory, IconBooks,
+  IconLayoutDashboard, IconUsers, IconSettings, IconHelp,
+  IconBuildingCommunity, IconBooks, IconUsersGroup, IconFileCheck, IconHistory, IconFileText
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -15,7 +15,8 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-// Data menu default (Mahasiswa)
+// Diperbaiki: Definisi data menu dipindahkan ke atas sebelum digunakan
+// Data menu untuk Mahasiswa
 const dataMahasiswa = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/mahasiswa", icon: IconLayoutDashboard },
@@ -45,14 +46,16 @@ const dataDpl = {
 const dataLppm = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/lppm", icon: IconLayoutDashboard },
-    { title: "Manajemen Pengguna", url: "/dashboard/lppm", icon: IconUsers },
-    { title: "Bidang Penelitian", url: "#", icon: IconBooks },
+    { title: "Manajemen Pengguna", url: "/dashboard/lppm/users", icon: IconUsers },
+    { title: "Manajemen Kelompok", url: "/dashboard/lppm/kelompok", icon: IconUsersGroup },
+    { title: "Bidang Penelitian", url: "/dashboard/lppm/bidang", icon: IconBooks },
   ],
   navSecondary: [
     { title: "Pengaturan", url: "#", icon: IconSettings },
     { title: "Bantuan", url: "#", icon: IconHelp },
   ],
 };
+
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const [menuData, setMenuData] = React.useState(dataMahasiswa); // Default

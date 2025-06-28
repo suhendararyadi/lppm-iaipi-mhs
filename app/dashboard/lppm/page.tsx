@@ -2,39 +2,48 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { pb } from '@/lib/pocketbase';
-import { RecordModel, ClientResponseError } from 'pocketbase';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { IconUsers, IconUserPlus, IconEdit, IconTrash } from '@tabler/icons-react';
+import { ClientResponseError } from 'pocketbase';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // <-- Diperbaiki: Menambahkan CardDescription
+import { IconUsers, IconFileText, IconBooks, IconUserCheck } from '@tabler/icons-react';
 import { toast } from "sonner";
-import { UserFormDialog } from './user-form-dialog'; 
 
-interface User extends RecordModel {
-    nama_lengkap: string;
-    email: string;
-    role: 'mahasiswa' | 'dpl' | 'lppm';
+interface Stats {
+  totalUsers: number;
+  totalMahasiswa: number;
+  totalDpl: number;
+  totalLaporan: number;
+  totalBidang: number;
 }
 
-export default function LppmUserManagementPage() {
-  const [users, setUsers] = useState<User[]>([]);
+export default function LppmDashboardPage() {
+  const [stats, setStats] = useState<Stats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<RecordModel | null>(null);
 
-  const fetchUsers = useCallback(async (signal?: AbortSignal) => {
+  const fetchStats = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const userList = await pb.collection('users').getFullList<User>({
-          sort: '-created',
-          signal,
+      // Mengambil semua data secara bersamaan untuk efisiensi
+      const [usersData, laporansData, bidangData] = await Promise.all([
+        pb.collection('users').getList(1, 1, { filter: 'role != "lppm"', signal }),
+        pb.collection('laporans').getList(1, 1, { signal }),
+        pb.collection('bidang_penelitian').getList(1, 1, { signal }),
+      ]);
+
+      const mahasiswaData = await pb.collection('users').getList(1, 1, { filter: 'role = "mahasiswa"', signal });
+      const dplData = await pb.collection('users').getList(1, 1, { filter: 'role = "dpl"', signal });
+
+      setStats({
+        totalUsers: usersData.totalItems,
+        totalMahasiswa: mahasiswaData.totalItems,
+        totalDpl: dplData.totalItems,
+        totalLaporan: laporansData.totalItems,
+        totalBidang: bidangData.totalItems,
       });
-      setUsers(userList);
+
     } catch (error) {
       if (!(error instanceof ClientResponseError && error.isAbort)) {
-        console.error("Gagal memuat data pengguna:", error);
-        toast.error("Gagal memuat data pengguna.");
+        console.error("Gagal memuat data statistik:", error);
+        toast.error("Gagal memuat data statistik.");
       }
     } finally {
       if (!signal?.aborted) setIsLoading(false);
@@ -43,88 +52,41 @@ export default function LppmUserManagementPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchUsers(controller.signal);
+    fetchStats(controller.signal);
     return () => controller.abort();
-  }, [fetchUsers]);
+  }, [fetchStats]);
 
-  const handleOpenDialog = (user: RecordModel | null = null) => {
-    setEditingUser(user);
-    setIsDialogOpen(true);
-  };
-
-  const handleDelete = (userId: string, userName: string) => {
-    toast.error(`Apakah Anda yakin ingin menghapus pengguna "${userName}"?`, {
-      action: {
-        label: "Hapus",
-        onClick: async () => {
-          try {
-            await pb.collection('users').delete(userId);
-            toast.success("Pengguna berhasil dihapus.");
-            fetchUsers();
-          } catch (error) {
-            console.error("Gagal menghapus pengguna:", error);
-            toast.error("Gagal menghapus pengguna.");
-          }
-        },
-      },
-      cancel: { label: "Batal", onClick: () => {} },
-    });
-  };
+  if (isLoading) {
+    return <main className="flex-1 p-6"><div className="flex h-full items-center justify-center">Memuat statistik...</div></main>;
+  }
 
   return (
-    <main className="flex-1 overflow-y-auto p-4 md:p-6">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2"><IconUsers />Manajemen Pengguna</CardTitle>
-            <CardDescription>Tambah, edit, atau hapus data pengguna Mahasiswa dan DPL.</CardDescription>
-          </div>
-          <Button onClick={() => handleOpenDialog()}><IconUserPlus className="mr-2 h-4 w-4" /> Tambah Pengguna</Button>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nama Lengkap</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Peran (Role)</TableHead>
-                  <TableHead className="text-right">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                    <TableRow><TableCell colSpan={4} className="text-center h-24">Memuat data pengguna...</TableCell></TableRow>
-                ) : users.length > 0 ? (
-                  users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.nama_lengkap}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell><Badge variant={user.role === 'dpl' ? 'secondary' : user.role === 'lppm' ? 'default' : 'outline'}>{user.role}</Badge></TableCell>
-                      <TableCell className="text-right space-x-2">
-                        {/* Diperbaiki: Menambahkan onClick handler untuk tombol Edit */}
-                        <Button variant="outline" size="icon" onClick={() => handleOpenDialog(user)}><IconEdit className="h-4 w-4" /></Button>
-                        {pb.authStore.model?.id !== user.id && ( // Jangan biarkan admin menghapus dirinya sendiri
-                            <Button variant="destructive" size="icon" onClick={() => handleDelete(user.id, user.nama_lengkap)}><IconTrash className="h-4 w-4" /></Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow><TableCell colSpan={4} className="text-center h-24">Tidak ada data pengguna.</TableCell></TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+    <main className="flex-1 overflow-y-auto p-4 md:p-6 grid gap-6">
+       <div>
+        <h1 className="text-2xl font-semibold">Dasbor Super Admin</h1>
+        <p className="text-muted-foreground">Ringkasan data dan statistik dari seluruh sistem.</p>
+      </div>
       
-      <UserFormDialog 
-        isOpen={isDialogOpen}
-        onOpenChange={setIsDialogOpen}
-        onFormSubmit={fetchUsers}
-        user={editingUser}
-      />
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Pengguna</CardTitle><IconUsers className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.totalUsers}</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Mahasiswa</CardTitle><IconUsers className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.totalMahasiswa}</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">DPL</CardTitle><IconUserCheck className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.totalDpl}</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Laporan</CardTitle><IconFileText className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.totalLaporan}</div></CardContent></Card>
+        <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Bidang Penelitian</CardTitle><IconBooks className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats?.totalBidang}</div></CardContent></Card>
+      </div>
+
+      {/* Anda bisa menambahkan komponen chart atau tabel lain di sini nanti */}
+      <div className="mt-4">
+        <Card>
+            <CardHeader>
+                <CardTitle>Aktivitas Mendatang</CardTitle>
+                <CardDescription>Grafik dan data lainnya akan ditampilkan di sini.</CardDescription>
+            </CardHeader>
+            <CardContent className="h-64 flex items-center justify-center text-muted-foreground">
+                (Area untuk Chart)
+            </CardContent>
+        </Card>
+      </div>
     </main>
   );
 }
