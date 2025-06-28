@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
-import { RecordModel } from 'pocketbase';
+import { RecordModel, ClientResponseError } from 'pocketbase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { IconFileText, IconUsers, IconCheck, IconClock, IconAlertTriangle, IconPlus } from '@tabler/icons-react';
+import { toast } from "sonner";
 
 interface Laporan extends RecordModel {
     judul_kegiatan: string;
@@ -17,34 +19,66 @@ interface Laporan extends RecordModel {
 }
 
 export default function MahasiswaDashboardPage() {
+  const router = useRouter();
   const [laporans, setLaporans] = useState<Laporan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userName, setUserName] = useState('');
 
-  useEffect(() => {
+  const fetchData = useCallback(async (signal?: AbortSignal) => {
     const user = pb.authStore.model;
-    if (user) {
-        setUserName(user.nama_lengkap || 'Mahasiswa');
+    if (!user) {
+      router.replace('/login');
+      return;
     }
+    setUserName(user.nama_lengkap || 'Mahasiswa');
+    setIsLoading(true);
 
-    const fetchLaporan = async () => {
-      if (!user) return;
+    try {
+      let kelompokRecord;
       try {
-        const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`);
-        const laporanList = await pb.collection('laporans').getFullList<Laporan>({
-            filter: `kelompok.id="${kelompokRecord.id}"`,
-            sort: '-tanggal_kegiatan',
-        });
-        setLaporans(laporanList);
+        kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal });
       } catch (error) {
-        // Tidak menampilkan error jika kelompok belum ada, karena ini halaman ringkasan
-        console.error("Gagal memuat data laporan:", error);
-      } finally {
+        if (error instanceof ClientResponseError && error.status === 404) {
+          console.log("Membuat data kelompok baru untuk pengguna...");
+          kelompokRecord = await pb.collection('kelompok_mahasiswa').create({
+            ketua: user.id,
+            anggota: [],
+          }, { signal });
+        } else {
+          throw error;
+        }
+      }
+
+      const laporanList = await pb.collection('laporans').getFullList<Laporan>({
+          filter: `kelompok.id="${kelompokRecord.id}"`,
+          sort: '-tanggal_kegiatan',
+          signal,
+      });
+      setLaporans(laporanList);
+
+    } catch (error) {
+      // Diperbaiki: Menambahkan pengecekan untuk AbortError
+      if (error instanceof ClientResponseError && error.isAbort) {
+        console.log("Request to fetch dashboard data was aborted.");
+        return;
+      }
+      console.error("Gagal memuat data dasbor:", error);
+      toast.error("Gagal memuat data dasbor.");
+    } finally {
+      if (!signal?.aborted) {
         setIsLoading(false);
       }
+    }
+  }, [router]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchData(controller.signal);
+
+    return () => {
+      controller.abort();
     };
-    fetchLaporan();
-  }, []);
+  }, [fetchData]);
 
   const stats = useMemo(() => ({
     total: laporans.length,
@@ -63,7 +97,7 @@ export default function MahasiswaDashboardPage() {
   }
 
   if (isLoading) {
-    return <div className="flex h-full items-center justify-center p-6"><p>Memuat dasbor...</p></div>;
+    return <main className="flex-1 p-6"><div className="flex h-full items-center justify-center"><p>Memuat dasbor...</p></div></main>;
   }
 
   return (

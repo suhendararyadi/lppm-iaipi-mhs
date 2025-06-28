@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image" // <-- Diperbaiki: Impor komponen Image
+import Image from "next/image"
 import { ClientResponseError } from 'pocketbase'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -10,6 +10,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { pb } from "@/lib/pocketbase"
+import { toast } from "sonner"
+import { Loader2 } from "lucide-react" // Menggunakan ikon spinner
 
 export function LoginForm({
   className,
@@ -27,17 +29,39 @@ export function LoginForm({
     setError("");
 
     try {
-      await pb.collection('users').authWithPassword(email, password);
-      router.push('/dashboard');
-    } catch (err: unknown) { // <-- Diperbaiki: Menggunakan 'unknown' untuk tipe error yang lebih aman
+      // Dioptimalkan: Menangkap data pengguna yang berhasil login
+      const authData = await pb.collection('users').authWithPassword(email, password);
+      
+      toast.success("Login berhasil!");
+
+      // Dioptimalkan: Mengambil peran langsung dari data pengguna
+      const role = authData.record.role;
+
+      // Dioptimalkan: Mengarahkan langsung ke dasbor yang sesuai
+      switch (role) {
+        case 'mahasiswa':
+          router.push('/dashboard/mahasiswa');
+          break;
+        case 'dpl':
+          router.push('/dashboard/dpl');
+          break;
+        case 'lppm':
+          router.push('/dashboard/lppm');
+          break;
+        default:
+          // Fallback jika peran tidak dikenali
+          router.push('/dashboard');
+          break;
+      }
+
+    } catch (err: unknown) {
       if (err instanceof ClientResponseError) {
           setError("Gagal masuk. Periksa kembali email dan password Anda.");
       } else {
           setError("Terjadi kesalahan yang tidak diketahui.");
       }
       console.error("Login Error:", err);
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Hanya set loading false jika login gagal
     }
   };
 
@@ -86,7 +110,12 @@ export function LoginForm({
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Memuat..." : "Masuk"}
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Memuat...
+                  </>
+                ) : "Masuk"}
               </Button>
               <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
                 <span className="bg-card text-muted-foreground relative z-10 px-2">
@@ -131,9 +160,8 @@ export function LoginForm({
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
-            {/* Diperbaiki: Menggunakan komponen Image dari Next.js */}
             <Image
-              src="/placeholder.svg"
+              src="https://placehold.co/800x600/e2e8f0/64748b?text=."
               alt="Illustrasi Halaman Login"
               fill
               style={{ objectFit: 'cover' }}
