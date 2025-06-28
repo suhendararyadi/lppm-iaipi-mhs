@@ -1,13 +1,10 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, FormEvent, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
-import { AppSidebar } from "@/components/app-sidebar";
-import { SiteHeader } from "@/components/site-header";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,29 +31,34 @@ export default function KelolaAnggotaPage() {
   const [nim, setNim] = useState('');
   const [prodi, setProdi] = useState('');
 
-  useEffect(() => {
+  const fetchKelompokData = useCallback(async (signal?: AbortSignal) => {
     const user = pb.authStore.model;
     if (!user) {
-      router.replace('/login');
-      return;
+        router.replace('/login');
+        return;
     }
-
-    const fetchKelompokData = async () => {
-      try {
-        const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`);
-        setKelompok(kelompokRecord);
-        setAnggota(kelompokRecord.anggota?.map((a: AnggotaData) => ({ ...a, id: crypto.randomUUID() })) || []);
-      } catch (error) {
-        if (error instanceof ClientResponseError && error.status === 404) {
-          // Handle jika kelompok belum ada
-          console.warn("Kelompok belum dibuat untuk pengguna ini.");
-        }
-      } finally {
-        setIsLoading(false);
+    try {
+      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal });
+      setKelompok(kelompokRecord);
+      setAnggota(kelompokRecord.anggota?.map((a: AnggotaData) => ({ ...a, id: crypto.randomUUID() })) || []);
+    } catch (error) {
+      if (!(error instanceof ClientResponseError && error.isAbort)) {
+        console.error("Gagal memuat data kelompok:", error);
+        toast.error("Gagal memuat data kelompok.");
       }
-    };
-    fetchKelompokData();
+    } finally {
+      if (!signal?.aborted) setIsLoading(false);
+    }
   }, [router]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchKelompokData(controller.signal);
+
+    return () => {
+        controller.abort();
+    }
+  }, [fetchKelompokData]);
   
   const handleTambahAnggota = async (e: FormEvent) => {
     e.preventDefault();
@@ -70,7 +72,6 @@ export default function KelolaAnggotaPage() {
       toast.success("Anggota berhasil ditambahkan!");
       setNama(''); setNim(''); setProdi('');
     } catch (error) {
-      // Diperbaiki: Menambahkan console.error untuk menggunakan variabel 'error'
       console.error("Gagal menambah anggota:", error);
       toast.error("Gagal menambah anggota.");
     }
@@ -85,55 +86,48 @@ export default function KelolaAnggotaPage() {
       setAnggota(updatedAnggotaList);
       toast.success("Anggota berhasil dihapus.");
     } catch (error) {
-      // Diperbaiki: Menambahkan console.error untuk menggunakan variabel 'error'
       console.error("Gagal menghapus anggota:", error);
       toast.error("Gagal menghapus anggota.");
     }
   };
 
   return (
-    <SidebarProvider>
-      <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <div className="mb-6">
-            <Link href="/dashboard/mahasiswa">
-              <Button variant="outline" size="sm"><IconChevronLeft className="h-4 w-4 mr-1" />Kembali ke Dasbor</Button>
-            </Link>
+    <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <div className="mb-6">
+        <Link href="/dashboard/mahasiswa">
+          <Button variant="outline" size="sm"><IconChevronLeft className="h-4 w-4 mr-1" />Kembali ke Dasbor</Button>
+        </Link>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><IconUsers />Kelola Anggota Kelompok</CardTitle>
+          <CardDescription>Tambah, lihat, dan hapus anggota kelompok penelitian Anda.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-6">
+          <form onSubmit={handleTambahAnggota} className="grid md:grid-cols-4 gap-4 items-end p-4 border rounded-lg">
+            <div className="grid gap-1.5"><Label htmlFor="nama">Nama Lengkap</Label><Input id="nama" value={nama} onChange={e => setNama(e.target.value)} placeholder="Nama anggota" required /></div>
+            <div className="grid gap-1.5"><Label htmlFor="nim">NIM</Label><Input id="nim" value={nim} onChange={e => setNim(e.target.value)} placeholder="NIM" required /></div>
+            <div className="grid gap-1.5"><Label htmlFor="prodi">Program Studi</Label><Input id="prodi" value={prodi} onChange={e => setProdi(e.target.value)} placeholder="Prodi" required /></div>
+            <Button type="submit" className="w-full"><IconUserPlus className="mr-2" />Tambah</Button>
+          </form>
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader><TableRow><TableHead>No</TableHead><TableHead>Nama</TableHead><TableHead>NIM</TableHead><TableHead>Prodi</TableHead><TableHead className="text-right">Aksi</TableHead></TableRow></TableHeader>
+              <TableBody>
+                {isLoading ? (
+                    <TableRow><TableCell colSpan={5} className="text-center h-24">Memuat anggota...</TableCell></TableRow>
+                ) : anggota.length > 0 ? (
+                  anggota.map((item, index) => (
+                    <TableRow key={item.id}><TableCell>{index + 1}</TableCell><TableCell>{item.nama}</TableCell><TableCell>{item.nim}</TableCell><TableCell>{item.prodi}</TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => handleHapusAnggota(item.id)}><IconTrash className="h-4 w-4 text-destructive" /></Button></TableCell></TableRow>
+                  ))
+                ) : (
+                  <TableRow><TableCell colSpan={5} className="text-center h-24">Belum ada anggota.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><IconUsers />Kelola Anggota Kelompok</CardTitle>
-              <CardDescription>Tambah, lihat, dan hapus anggota kelompok penelitian Anda.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-6">
-              <form onSubmit={handleTambahAnggota} className="grid md:grid-cols-4 gap-4 items-end p-4 border rounded-lg">
-                <div className="grid gap-1.5"><Label htmlFor="nama">Nama Lengkap</Label><Input id="nama" value={nama} onChange={e => setNama(e.target.value)} placeholder="Nama anggota" required /></div>
-                <div className="grid gap-1.5"><Label htmlFor="nim">NIM</Label><Input id="nim" value={nim} onChange={e => setNim(e.target.value)} placeholder="NIM" required /></div>
-                <div className="grid gap-1.5"><Label htmlFor="prodi">Program Studi</Label><Input id="prodi" value={prodi} onChange={e => setProdi(e.target.value)} placeholder="Prodi" required /></div>
-                <Button type="submit" className="w-full"><IconUserPlus className="mr-2" />Tambah</Button>
-              </form>
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader><TableRow><TableHead>No</TableHead><TableHead>Nama</TableHead><TableHead>NIM</TableHead><TableHead>Prodi</TableHead><TableHead className="text-right">Aksi</TableHead></TableRow></TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                        <TableRow><TableCell colSpan={5} className="text-center h-24">Memuat anggota...</TableCell></TableRow>
-                    ) : anggota.length > 0 ? (
-                      anggota.map((item, index) => (
-                        <TableRow key={item.id}><TableCell>{index + 1}</TableCell><TableCell>{item.nama}</TableCell><TableCell>{item.nim}</TableCell><TableCell>{item.prodi}</TableCell><TableCell className="text-right"><Button variant="ghost" size="icon" onClick={() => handleHapusAnggota(item.id)}><IconTrash className="h-4 w-4 text-destructive" /></Button></TableCell></TableRow>
-                      ))
-                    ) : (
-                      <TableRow><TableCell colSpan={5} className="text-center h-24">Belum ada anggota.</TableCell></TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
+        </CardContent>
+      </Card>
+    </main>
   );
 }
