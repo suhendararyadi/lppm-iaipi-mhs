@@ -1,121 +1,182 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { IconFileCheck, IconEye } from '@tabler/icons-react';
-import { toast } from "sonner";
+import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { IconChevronLeft, IconPaperclip, IconDownload } from '@tabler/icons-react';
+import { toast } from 'sonner';
 
-interface Laporan extends RecordModel {
+// Tipe untuk data laporan yang diperluas
+interface LaporanDetail extends RecordModel {
     judul_kegiatan: string;
+    tanggal_kegiatan: string;
+    tempat_pelaksanaan: string;
+    narasumber: string;
+    unsur_terlibat: string;
+    deskripsi_kegiatan: string;
+    rencana_tindak_lanjut: string;
     status: string;
-    updated: string;
+    catatan_dpl?: string;
+    mahasiswa_terlibat: string[];
+    dokumen_pendukung?: string[];
     expand?: {
-        kelompok?: {
-            expand?: {
-                ketua?: {
-                    nama_lengkap: string;
-                }
-            }
+        bidang_penelitian?: {
+            nama_bidang: string;
         }
     }
 }
 
-export default function DplLaporanListPage() {
+export default function DetailLaporanDplPage() {
   const router = useRouter();
-  const [laporans, setLaporans] = useState<Laporan[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const params = useParams();
+  const { id } = params;
 
-  const fetchLaporanBimbingan = useCallback(async (signal?: AbortSignal) => {
-    const user = pb.authStore.model;
-    if (!user) {
-      router.replace('/login');
-      return;
-    }
-    setIsLoading(true);
+  const [laporan, setLaporan] = useState<LaporanDetail | null>(null);
+  const [catatan, setCatatan] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const fetchLaporan = useCallback(async (signal?: AbortSignal) => {
+    if (!id || typeof id !== 'string') return;
+    
     try {
-      const laporanList = await pb.collection('laporans').getFullList<Laporan>({
-          filter: `kelompok.dpl.id = "${user.id}"`,
-          sort: '-updated',
-          expand: 'kelompok.ketua',
-          signal,
+      const record = await pb.collection('laporans').getOne<LaporanDetail>(id, {
+        expand: 'bidang_penelitian',
+        signal,
       });
-      setLaporans(laporanList);
+      setLaporan(record);
+      setCatatan(record.catatan_dpl || '');
     } catch (error) {
       if (!(error instanceof ClientResponseError && error.isAbort)) {
-        console.error("Gagal memuat data laporan:", error);
-        toast.error("Gagal memuat daftar laporan bimbingan.");
+        toast.error("Gagal memuat detail laporan.");
+        router.push('/dashboard/dpl');
       }
     } finally {
       if (!signal?.aborted) setIsLoading(false);
     }
-  }, [router]);
+  }, [id, router]);
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchLaporanBimbingan(controller.signal);
+    fetchLaporan(controller.signal);
     return () => controller.abort();
-  }, [fetchLaporanBimbingan]);
+  }, [fetchLaporan]);
 
-  const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-        case 'Disetujui': return 'default';
-        case 'Menunggu Persetujuan': return 'secondary';
-        case 'Revisi': return 'destructive';
-        default: return 'outline';
+  const handleVerifikasi = async (status: 'Disetujui' | 'Revisi') => {
+    if (!laporan) return;
+    setIsSubmitting(true);
+    try {
+        await pb.collection('laporans').update(laporan.id, {
+            status: status,
+            catatan_dpl: catatan,
+            tanggal_disetujui: status === 'Disetujui' ? new Date().toISOString() : null,
+        });
+        toast.success(`Laporan telah ditandai sebagai "${status}"`);
+        router.push('/dashboard/dpl');
+    } catch (error) {
+        toast.error("Gagal memperbarui status laporan.");
+        console.error("Update error:", error);
+    } finally {
+        setIsSubmitting(false);
     }
   }
 
+  if (isLoading) {
+    return <main className="flex-1 p-6"><div className="flex h-full items-center justify-center">Memuat detail laporan...</div></main>;
+  }
+
+  if (!laporan) {
+    return <main className="flex-1 p-6"><div className="flex h-full items-center justify-center">Laporan tidak ditemukan.</div></main>;
+  }
+
   return (
-    <main className="flex-1 overflow-y-auto p-4 md:p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><IconFileCheck />Semua Laporan Bimbingan</CardTitle>
-          <CardDescription>Berikut adalah seluruh riwayat laporan dari mahasiswa bimbingan Anda.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Judul Laporan</TableHead>
-                  <TableHead>Ketua Kelompok</TableHead>
-                  <TableHead>Update Terakhir</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Aksi</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                    <TableRow><TableCell colSpan={5} className="text-center h-24">Memuat laporan...</TableCell></TableRow>
-                ) : laporans.length > 0 ? (
-                  laporans.map((laporan) => (
-                    <TableRow key={laporan.id}>
-                      <TableCell className="font-medium">{laporan.judul_kegiatan}</TableCell>
-                      <TableCell>{laporan.expand?.kelompok?.expand?.ketua?.nama_lengkap || '-'}</TableCell>
-                      <TableCell>{new Date(laporan.updated).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</TableCell>
-                      <TableCell><Badge variant={getStatusBadgeVariant(laporan.status)}>{laporan.status}</Badge></TableCell>
-                      <TableCell className="text-right">
-                        <Link href={`/dashboard/dpl/laporan/${laporan.id}`}>
-                            <Button variant="outline" size="icon"><IconEye className="h-4 w-4" /></Button>
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow><TableCell colSpan={5} className="text-center h-24">Tidak ada laporan yang perlu diverifikasi saat ini.</TableCell></TableRow>
+    <main className="flex-1 overflow-y-auto p-4 md:p-6 grid gap-6">
+      <div className="mb-6">
+        <Link href="/dashboard/dpl">
+          <Button variant="outline" size="sm"><IconChevronLeft className="h-4 w-4 mr-1" />Kembali ke Daftar Verifikasi</Button>
+        </Link>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Kolom Kiri: Detail Laporan */}
+        <div className="lg:col-span-2">
+            <Card>
+                <CardHeader>
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle className="text-2xl">{laporan.judul_kegiatan}</CardTitle>
+                        <CardDescription>
+                        {new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                        </CardDescription>
+                    </div>
+                    <Badge>{laporan.status}</Badge>
+                </div>
+                </CardHeader>
+                <CardContent className="grid gap-6">
+                <div className="grid md:grid-cols-3 gap-4 text-sm">
+                    <div className="flex flex-col"><span className="text-muted-foreground">Bidang Penelitian</span><span className="font-medium">{laporan.expand?.bidang_penelitian?.nama_bidang || '-'}</span></div>
+                    <div className="flex flex-col"><span className="text-muted-foreground">Tempat</span><span className="font-medium">{laporan.tempat_pelaksanaan}</span></div>
+                    <div className="flex flex-col"><span className="text-muted-foreground">Narasumber</span><span className="font-medium">{laporan.narasumber || '-'}</span></div>
+                </div>
+                <div className="space-y-2"><h3 className="font-semibold">Deskripsi Kegiatan</h3><div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: laporan.deskripsi_kegiatan }}></div></div>
+                <div className="space-y-2"><h3 className="font-semibold">Rencana Tindak Lanjut</h3><p className="text-muted-foreground">{laporan.rencana_tindak_lanjut || '-'}</p></div>
+                <div className="grid md:grid-cols-2 gap-6">
+                    <div className="space-y-2"><h3 className="font-semibold">Mahasiswa Terlibat</h3><ul className="list-disc list-inside text-muted-foreground">{laporan.mahasiswa_terlibat.map((nama, i) => <li key={i}>{nama}</li>)}</ul></div>
+                    <div className="space-y-2"><h3 className="font-semibold">Unsur Luar Terlibat</h3><p className="text-muted-foreground">{laporan.unsur_terlibat || '-'}</p></div>
+                </div>
+                {laporan.dokumen_pendukung && laporan.dokumen_pendukung.length > 0 && (
+                    <div className="space-y-2">
+                    <h3 className="font-semibold">Dokumen Pendukung</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                        {laporan.dokumen_pendukung.map((file, i) => (
+                        <a key={i} href={pb.getFileUrl(laporan, file)} target="_blank" rel="noopener noreferrer" className="text-sm">
+                            <Button variant="outline" className="w-full justify-start gap-2"><IconPaperclip className="h-4 w-4" /><span className="truncate">{file}</span><IconDownload className="h-4 w-4 ml-auto" /></Button>
+                        </a>
+                        ))}
+                    </div>
+                    </div>
                 )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                </CardContent>
+            </Card>
+        </div>
+
+        {/* Kolom Kanan: Aksi Verifikasi */}
+        <div className="lg:col-span-1">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Aksi Verifikasi</CardTitle>
+                    <CardDescription>Berikan catatan dan setujui atau minta revisi untuk laporan ini.</CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-4">
+                    <div>
+                        <Label htmlFor="catatan_dpl">Catatan/Feedback</Label>
+                        <Textarea 
+                            id="catatan_dpl"
+                            placeholder="Tulis catatan di sini jika ada revisi..."
+                            rows={8}
+                            value={catatan}
+                            onChange={(e) => setCatatan(e.target.value)}
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Button onClick={() => handleVerifikasi('Disetujui')} disabled={isSubmitting}>
+                            {isSubmitting ? 'Memproses...' : 'Setujui Laporan'}
+                        </Button>
+                        <Button variant="destructive" onClick={() => handleVerifikasi('Revisi')} disabled={isSubmitting}>
+                            {isSubmitting ? 'Memproses...' : 'Minta Revisi'}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+      </div>
     </main>
   );
 }
