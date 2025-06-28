@@ -1,41 +1,31 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
-import { RecordModel, ClientResponseError } from 'pocketbase';
+import { RecordModel } from 'pocketbase';
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { IconUserPlus, IconTrash, IconUsers } from '@tabler/icons-react';
-import { toast } from "sonner";
+import { Badge } from '@/components/ui/badge';
+import { IconFileText, IconUsers, IconCheck, IconClock, IconAlertTriangle, IconPlus } from '@tabler/icons-react';
 
-// Definisikan tipe untuk anggota
-interface Anggota {
-  id: string; // Menggunakan ID unik untuk key di React
-  nama: string;
-  nim: string;
-  prodi: string;
+// Definisikan tipe untuk Laporan
+interface Laporan extends RecordModel {
+    judul_kegiatan: string;
+    tanggal_kegiatan: string;
+    status: 'Draft' | 'Menunggu Persetujuan' | 'Disetujui' | 'Revisi';
 }
-
-// Tipe untuk data anggota yang disimpan di PocketBase (tanpa id sementara)
-type AnggotaData = Omit<Anggota, 'id'>;
 
 export default function MahasiswaDashboardPage() {
   const router = useRouter();
-  const [kelompok, setKelompok] = useState<RecordModel | null>(null);
-  const [anggota, setAnggota] = useState<Anggota[]>([]);
+  const [laporans, setLaporans] = useState<Laporan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // State untuk form tambah anggota
-  const [nama, setNama] = useState('');
-  const [nim, setNim] = useState('');
-  const [prodi, setProdi] = useState('');
+  const [userName, setUserName] = useState('');
 
   useEffect(() => {
     const user = pb.authStore.model;
@@ -43,82 +33,48 @@ export default function MahasiswaDashboardPage() {
       router.replace('/login');
       return;
     }
+    setUserName(user.nama_lengkap || 'Mahasiswa');
 
-    const fetchKelompokData = async () => {
+    const fetchLaporan = async () => {
+      setIsLoading(true);
       try {
-        // Cari record kelompok yang ketuanya adalah user yang sedang login
         const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`);
-        setKelompok(kelompokRecord);
-        // Inisialisasi anggota dari data yang ada, tambahkan ID unik
-        setAnggota(kelompokRecord.anggota?.map((a: AnggotaData) => ({ ...a, id: crypto.randomUUID() })) || []);
-      } catch (error: unknown) {
-        // Jika tidak ada, buat record kelompok baru untuk user ini
-        if (error instanceof ClientResponseError && error.status === 404) {
-          try {
-            const newKelompok = await pb.collection('kelompok_mahasiswa').create({
-              ketua: user.id,
-              anggota: [],
-            });
-            setKelompok(newKelompok);
-            setAnggota([]);
-          } catch (creationError) {
-            console.error("Gagal membuat data kelompok:", creationError);
-            toast.error("Gagal membuat data kelompok.");
-          }
-        } else {
-          console.error("Gagal memuat data kelompok:", error);
-          toast.error("Gagal memuat data kelompok.");
-        }
+        const laporanList = await pb.collection('laporans').getFullList<Laporan>({
+            filter: `kelompok.id="${kelompokRecord.id}"`,
+            sort: '-tanggal_kegiatan',
+        });
+        setLaporans(laporanList);
+      } catch (error) {
+        console.error("Gagal memuat data laporan:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchKelompokData();
+    fetchLaporan();
   }, [router]);
 
-  const handleTambahAnggota = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!nama || !nim || !prodi || !kelompok) return;
+  // Hitung statistik menggunakan useMemo agar tidak dihitung ulang setiap render
+  const stats = useMemo(() => {
+    return {
+      total: laporans.length,
+      disetujui: laporans.filter(l => l.status === 'Disetujui').length,
+      menunggu: laporans.filter(l => l.status === 'Menunggu Persetujuan').length,
+      revisi: laporans.filter(l => l.status === 'Revisi').length,
+    };
+  }, [laporans]);
 
-    const newAnggota: Anggota = { id: crypto.randomUUID(), nama, nim, prodi };
-    const updatedAnggotaList = [...anggota, newAnggota];
-    
-    try {
-      await pb.collection('kelompok_mahasiswa').update(kelompok.id, {
-        anggota: updatedAnggotaList.map(({ id: _, ...rest }) => rest), // Simpan tanpa ID sementara, abaikan 'id'
-      });
-      setAnggota(updatedAnggotaList);
-      toast.success("Anggota berhasil ditambahkan!");
-      // Reset form
-      setNama('');
-      setNim('');
-      setProdi('');
-    } catch (error) {
-      console.error("Gagal menambah anggota:", error);
-      toast.error("Gagal menambah anggota.");
+  const getStatusBadgeVariant = (status: Laporan['status']): "default" | "secondary" | "destructive" | "outline" => {
+    switch (status) {
+        case 'Disetujui': return 'default';
+        case 'Menunggu Persetujuan': return 'secondary';
+        case 'Revisi': return 'destructive';
+        default: return 'outline';
     }
-  };
-
-  const handleHapusAnggota = async (idToRemove: string) => {
-    if (!kelompok) return;
-
-    const updatedAnggotaList = anggota.filter(a => a.id !== idToRemove);
-
-    try {
-      await pb.collection('kelompok_mahasiswa').update(kelompok.id, {
-        anggota: updatedAnggotaList.map(({ id: _, ...rest }) => rest), // Simpan tanpa ID sementara, abaikan 'id'
-      });
-      setAnggota(updatedAnggotaList);
-      toast.success("Anggota berhasil dihapus.");
-    } catch (error) {
-      console.error("Gagal menghapus anggota:", error);
-      toast.error("Gagal menghapus anggota.");
-    }
-  };
+  }
 
   if (isLoading) {
-    return <div className="flex h-screen items-center justify-center">Memuat data mahasiswa...</div>;
+    return <div className="flex h-screen items-center justify-center">Memuat data dasbor...</div>;
   }
 
   return (
@@ -126,91 +82,56 @@ export default function MahasiswaDashboardPage() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          <h1 className="text-2xl font-semibold mb-6">Dasbor Mahasiswa</h1>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 grid gap-6">
+          <div>
+            <h1 className="text-2xl font-semibold">Selamat Datang, {userName}!</h1>
+            <p className="text-muted-foreground">Berikut adalah ringkasan aktivitas penelitian Anda.</p>
+          </div>
           
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <IconUsers />
-                Kelola Anggota Kelompok
-              </CardTitle>
-              <CardDescription>
-                Tambah, lihat, dan hapus anggota kelompok penelitian Anda.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-6">
-              {/* Form Tambah Anggota */}
-              <form onSubmit={handleTambahAnggota} className="grid md:grid-cols-4 gap-4 items-end p-4 border rounded-lg">
-                <div className="grid gap-1.5">
-                  <Label htmlFor="nama">Nama Lengkap</Label>
-                  <Input id="nama" value={nama} onChange={e => setNama(e.target.value)} placeholder="Nama anggota" required />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="nim">NIM</Label>
-                  <Input id="nim" value={nim} onChange={e => setNim(e.target.value)} placeholder="Nomor Induk Mahasiswa" required />
-                </div>
-                <div className="grid gap-1.5">
-                  <Label htmlFor="prodi">Program Studi</Label>
-                  <Input id="prodi" value={prodi} onChange={e => setProdi(e.target.value)} placeholder="Prodi" required />
-                </div>
-                <Button type="submit" className="w-full">
-                  <IconUserPlus className="mr-2" />
-                  Tambah
-                </Button>
-              </form>
+          {/* Kartu Statistik */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Total Laporan</CardTitle><IconFileText className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent></Card>
+            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Disetujui</CardTitle><IconCheck className="h-4 w-4 text-green-500" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.disetujui}</div></CardContent></Card>
+            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Menunggu</CardTitle><IconClock className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.menunggu}</div></CardContent></Card>
+            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Perlu Revisi</CardTitle><IconAlertTriangle className="h-4 w-4 text-destructive" /></CardHeader><CardContent><div className="text-2xl font-bold">{stats.revisi}</div></CardContent></Card>
+          </div>
 
-              {/* Tabel Anggota */}
-              <div className="border rounded-lg overflow-hidden">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
+            {/* Laporan Terbaru */}
+            <Card className="lg:col-span-4">
+              <CardHeader><CardTitle>Laporan Terbaru</CardTitle></CardHeader>
+              <CardContent>
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>No</TableHead>
-                      <TableHead>Nama Lengkap</TableHead>
-                      <TableHead>NIM</TableHead>
-                      <TableHead>Program Studi</TableHead>
-                      <TableHead className="text-right">Aksi</TableHead>
-                    </TableRow>
-                  </TableHeader>
+                  <TableHeader><TableRow><TableHead>Judul</TableHead><TableHead>Tanggal</TableHead><TableHead>Status</TableHead></TableRow></TableHeader>
                   <TableBody>
-                    {anggota.length > 0 ? (
-                      anggota.map((item, index) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{index + 1}</TableCell>
-                          <TableCell>{item.nama}</TableCell>
-                          <TableCell>{item.nim}</TableCell>
-                          <TableCell>{item.prodi}</TableCell>
-                          <TableCell className="text-right">
-                            <Button variant="ghost" size="icon" onClick={() => handleHapusAnggota(item.id)}>
-                              <IconTrash className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center h-24">
-                          Belum ada anggota. Silakan tambahkan.
-                        </TableCell>
+                    {laporans.slice(0, 3).map(laporan => (
+                      <TableRow key={laporan.id}>
+                        <TableCell className="font-medium">{laporan.judul_kegiatan}</TableCell>
+                        <TableCell>{new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID')}</TableCell>
+                        <TableCell><Badge variant={getStatusBadgeVariant(laporan.status)}>{laporan.status}</Badge></TableCell>
                       </TableRow>
-                    )}
+                    ))}
                   </TableBody>
                 </Table>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* Kartu untuk fitur selanjutnya */}
-          <Card className="mt-6">
-             <CardHeader>
-                <CardTitle>Laporan Penelitian</CardTitle>
-                <CardDescription>Buat dan kelola laporan penelitian Anda di sini.</CardDescription>
-             </CardHeader>
-             <CardContent>
-                <Button>Buat Laporan Baru</Button>
-             </CardContent>
-          </Card>
-
+            {/* Aksi Cepat */}
+            <Card className="lg:col-span-3">
+                <CardHeader><CardTitle>Aksi Cepat</CardTitle><CardDescription>Akses cepat ke fitur-fitur utama.</CardDescription></CardHeader>
+                <CardContent className="grid gap-4">
+                    <Link href="/dashboard/mahasiswa/laporan/baru">
+                        <Button className="w-full justify-start gap-2"><IconPlus />Buat Laporan Baru</Button>
+                    </Link>
+                    <Link href="/dashboard/mahasiswa/laporan">
+                        <Button variant="secondary" className="w-full justify-start gap-2"><IconFileText />Lihat Semua Laporan</Button>
+                    </Link>
+                    <Link href="/dashboard/mahasiswa/anggota">
+                        <Button variant="outline" className="w-full justify-start gap-2"><IconUsers />Kelola Anggota Kelompok</Button>
+                    </Link>
+                </CardContent>
+            </Card>
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>

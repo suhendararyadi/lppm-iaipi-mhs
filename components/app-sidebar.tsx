@@ -28,17 +28,17 @@ const dataMahasiswa = {
   navMain: [
     {
       title: "Dasbor",
-      url: "/dashboard/mahasiswa",
+      url: "/dashboard/mahasiswa", // <-- URL Halaman Utama Dasbor
       icon: IconLayoutDashboard,
     },
     {
       title: "Laporan Saya",
-      url: "#", // URL akan kita sesuaikan nanti
+      url: "/dashboard/mahasiswa/laporan", // <-- URL Halaman Daftar Laporan
       icon: IconFileText,
     },
     {
       title: "Anggota Kelompok",
-      url: "/dashboard/mahasiswa", // Mengarah ke halaman yang sama untuk saat ini
+      url: "/dashboard/mahasiswa/anggota", // <-- URL Halaman Kelola Anggota
       icon: IconUsers,
     },
   ],
