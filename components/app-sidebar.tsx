@@ -3,30 +3,19 @@
 import * as React from "react"
 import { pb } from "@/lib/pocketbase";
 import {
-  IconLayoutDashboard,
-  IconFileText,
-  IconUsers,
-  IconSettings,
-  IconHelp,
-  IconBuildingCommunity,
-  IconFileCheck,
-  IconHistory,
+  IconLayoutDashboard, IconFileText, IconUsers, IconSettings, IconHelp,
+  IconBuildingCommunity, IconFileCheck, IconHistory, IconBooks,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
+  Sidebar, SidebarContent, SidebarFooter, SidebarHeader,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-// Data menu untuk Mahasiswa
+// Data menu default (Mahasiswa)
 const dataMahasiswa = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/mahasiswa", icon: IconLayoutDashboard },
@@ -44,7 +33,20 @@ const dataDpl = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/dpl", icon: IconLayoutDashboard },
     { title: "Verifikasi Laporan", url: "/dashboard/dpl/laporan", icon: IconFileCheck },
-    { title: "Riwayat Verifikasi", url: "#", icon: IconHistory }, // URL untuk masa depan
+    { title: "Riwayat Verifikasi", url: "#", icon: IconHistory },
+  ],
+  navSecondary: [
+    { title: "Pengaturan", url: "#", icon: IconSettings },
+    { title: "Bantuan", url: "#", icon: IconHelp },
+  ],
+};
+
+// Data menu untuk LPPM
+const dataLppm = {
+  navMain: [
+    { title: "Dasbor", url: "/dashboard/lppm", icon: IconLayoutDashboard },
+    { title: "Manajemen Pengguna", url: "/dashboard/lppm", icon: IconUsers },
+    { title: "Bidang Penelitian", url: "#", icon: IconBooks },
   ],
   navSecondary: [
     { title: "Pengaturan", url: "#", icon: IconSettings },
@@ -53,12 +55,14 @@ const dataDpl = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const [menuData, setMenuData] = React.useState(dataMahasiswa); // Default ke mahasiswa
+  const [menuData, setMenuData] = React.useState(dataMahasiswa); // Default
 
   React.useEffect(() => {
     const user = pb.authStore.model;
     if (user?.role === 'dpl') {
       setMenuData(dataDpl);
+    } else if (user?.role === 'lppm') {
+      setMenuData(dataLppm);
     } else {
       setMenuData(dataMahasiswa);
     }
