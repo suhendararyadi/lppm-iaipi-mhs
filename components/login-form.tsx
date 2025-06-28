@@ -2,12 +2,14 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image" // <-- Diperbaiki: Impor komponen Image
+import { ClientResponseError } from 'pocketbase'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { pb } from "@/lib/pocketbase" // Import instance PocketBase
+import { pb } from "@/lib/pocketbase"
 
 export function LoginForm({
   className,
@@ -25,14 +27,14 @@ export function LoginForm({
     setError("");
 
     try {
-      // Menggunakan koleksi 'users' untuk autentikasi
       await pb.collection('users').authWithPassword(email, password);
-      
-      // Jika autentikasi berhasil, arahkan ke halaman dashboard
       router.push('/dashboard');
-    } catch (err: any) {
-      // Menangani error jika autentikasi gagal
-      setError("Gagal masuk. Periksa kembali email dan password Anda.");
+    } catch (err: unknown) { // <-- Diperbaiki: Menggunakan 'unknown' untuk tipe error yang lebih aman
+      if (err instanceof ClientResponseError) {
+          setError("Gagal masuk. Periksa kembali email dan password Anda.");
+      } else {
+          setError("Terjadi kesalahan yang tidak diketahui.");
+      }
       console.error("Login Error:", err);
     } finally {
       setIsLoading(false);
@@ -129,10 +131,14 @@ export function LoginForm({
             </div>
           </form>
           <div className="bg-muted relative hidden md:block">
-            <img
-              src="https://placehold.co/800x600/e2e8f0/e2e8f0?text=."
-              alt="Placeholder"
-              className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
+            {/* Diperbaiki: Menggunakan komponen Image dari Next.js */}
+            <Image
+              src="/placeholder.svg"
+              alt="Illustrasi Halaman Login"
+              fill
+              style={{ objectFit: 'cover' }}
+              className="dark:brightness-[0.2] dark:grayscale"
+              priority
             />
           </div>
         </CardContent>

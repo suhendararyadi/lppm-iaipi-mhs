@@ -63,9 +63,9 @@ export default function DetailLaporanPage() {
     };
     
     try {
-      // Diperbaiki: Menambahkan 'kelompok' ke dalam expand untuk memuat data kelompok
+      // Diperbaiki: Menambahkan 'kelompok.ketua' untuk memuat data ketua di dalam kelompok
       const record = await pb.collection('laporans').getOne<LaporanDetail>(id, {
-        expand: 'bidang_penelitian,kelompok,kelompok.ketua',
+        expand: 'bidang_penelitian,kelompok.ketua',
         signal,
       });
       setLaporan(record);
@@ -98,7 +98,7 @@ export default function DetailLaporanPage() {
         toast.error("Data laporan belum lengkap untuk membuat PDF.");
         return;
     }
-    const doc = new jsPDF();
+    const doc = new jsPDF() as jsPDFWithAutoTable; // Menggunakan type assertion di sini
     const kelompok = laporan.expand.kelompok;
     const ketua = kelompok.expand.ketua;
 
@@ -121,8 +121,8 @@ export default function DetailLaporanPage() {
     });
 
     autoTable(doc, {
-        // Diperbaiki: Menggunakan interface kustom untuk menghindari 'any' dan '@ts-expect-error'
-        startY: (doc as jsPDFWithAutoTable).lastAutoTable.finalY + 10,
+        // Diperbaiki: Tidak perlu lagi komentar atau 'any' karena 'doc' sudah di-cast tipenya
+        startY: doc.lastAutoTable.finalY + 10,
         head: [['Detail Laporan']],
         body: [
             ['Tanggal Kegiatan', new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })],
