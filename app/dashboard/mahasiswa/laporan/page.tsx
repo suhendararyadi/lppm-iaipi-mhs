@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react'; // <-- Tambahkan impor useCallback
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { IconFileText, IconEye, IconPencil, IconTrash } from '@tabler/icons-react';
+import { toast } from "sonner"; // Import toast untuk notifikasi
 
 interface Laporan extends RecordModel {
     judul_kegiatan: string;
@@ -30,30 +31,57 @@ export default function LaporanListPage() {
   const [laporans, setLaporans] = useState<Laporan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  // Diperbaiki: Bungkus dengan useCallback dan tambahkan router sebagai dependensi
+  const fetchLaporan = useCallback(async () => {
     const user = pb.authStore.model;
     if (!user) {
       router.replace('/login');
       return;
     }
-
-    const fetchLaporan = async () => {
-      try {
-        const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`);
-        const laporanList = await pb.collection('laporans').getFullList<Laporan>({
-            filter: `kelompok.id="${kelompokRecord.id}"`,
-            sort: '-tanggal_kegiatan',
-            expand: 'bidang_penelitian'
-        });
-        setLaporans(laporanList);
-      } catch (error) {
-        console.error("Gagal memuat data laporan:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchLaporan();
+    setIsLoading(true);
+    try {
+      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`);
+      const laporanList = await pb.collection('laporans').getFullList<Laporan>({
+          filter: `kelompok.id="${kelompokRecord.id}"`,
+          sort: '-tanggal_kegiatan',
+          expand: 'bidang_penelitian'
+      });
+      setLaporans(laporanList);
+    } catch (error) {
+      console.error("Gagal memuat data laporan:", error);
+      toast.error("Gagal memuat daftar laporan.");
+    } finally {
+      setIsLoading(false);
+    }
   }, [router]);
+
+  // Diperbaiki: Tambahkan fetchLaporan ke dependency array
+  useEffect(() => {
+    fetchLaporan();
+  }, [fetchLaporan]);
+
+  const handleDelete = (laporanId: string, laporanJudul: string) => {
+    toast.error(`Apakah Anda yakin ingin menghapus laporan "${laporanJudul}"?`, {
+      action: {
+        label: "Hapus",
+        onClick: async () => {
+          try {
+            await pb.collection('laporans').delete(laporanId);
+            toast.success("Laporan berhasil dihapus.");
+            fetchLaporan(); // Muat ulang data setelah menghapus
+          } catch (error) {
+            toast.error("Gagal menghapus laporan.");
+            console.error("Delete error:", error);
+          }
+        },
+      },
+      // Diperbaiki: Tambahkan onClick handler kosong untuk memenuhi tipe data
+      cancel: {
+        label: "Batal",
+        onClick: () => {},
+      },
+    });
+  };
 
   const getStatusBadgeVariant = (status: Laporan['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -103,9 +131,11 @@ export default function LaporanListPage() {
                           <TableCell>{new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</TableCell>
                           <TableCell><Badge variant={getStatusBadgeVariant(laporan.status)}>{laporan.status}</Badge></TableCell>
                           <TableCell className="text-right space-x-2">
-                            <Button variant="outline" size="icon"><IconEye className="h-4 w-4" /></Button>
-                            <Button variant="outline" size="icon"><IconPencil className="h-4 w-4" /></Button>
-                            <Button variant="destructive" size="icon"><IconTrash className="h-4 w-4" /></Button>
+                            <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}`}>
+                                <Button variant="outline" size="icon"><IconEye className="h-4 w-4" /></Button>
+                            </Link>
+                            <Button variant="outline" size="icon" disabled><IconPencil className="h-4 w-4" /></Button>
+                            <Button variant="destructive" size="icon" onClick={() => handleDelete(laporan.id, laporan.judul_kegiatan)}><IconTrash className="h-4 w-4" /></Button>
                           </TableCell>
                         </TableRow>
                       ))
