@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { pb } from "@/lib/pocketbase";
 import {
   IconLayoutDashboard,
   IconFileText,
@@ -8,6 +9,8 @@ import {
   IconSettings,
   IconHelp,
   IconBuildingCommunity,
+  IconFileCheck,
+  IconHistory,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -23,49 +26,50 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
-// Data menu telah disesuaikan untuk peran Mahasiswa
+// Data menu untuk Mahasiswa
 const dataMahasiswa = {
   navMain: [
-    {
-      title: "Dasbor",
-      url: "/dashboard/mahasiswa", // <-- URL Halaman Utama Dasbor
-      icon: IconLayoutDashboard,
-    },
-    {
-      title: "Laporan Saya",
-      url: "/dashboard/mahasiswa/laporan", // <-- URL Halaman Daftar Laporan
-      icon: IconFileText,
-    },
-    {
-      title: "Anggota Kelompok",
-      url: "/dashboard/mahasiswa/anggota", // <-- URL Halaman Kelola Anggota
-      icon: IconUsers,
-    },
+    { title: "Dasbor", url: "/dashboard/mahasiswa", icon: IconLayoutDashboard },
+    { title: "Laporan Saya", url: "/dashboard/mahasiswa/laporan", icon: IconFileText },
+    { title: "Anggota Kelompok", url: "/dashboard/mahasiswa/anggota", icon: IconUsers },
   ],
   navSecondary: [
-    {
-      title: "Pengaturan",
-      url: "#",
-      icon: IconSettings,
-    },
-    {
-      title: "Bantuan",
-      url: "#",
-      icon: IconHelp,
-    },
+    { title: "Pengaturan", url: "#", icon: IconSettings },
+    { title: "Bantuan", url: "#", icon: IconHelp },
   ],
-}
+};
+
+// Data menu untuk DPL
+const dataDpl = {
+  navMain: [
+    { title: "Dasbor", url: "/dashboard/dpl", icon: IconLayoutDashboard },
+    { title: "Verifikasi Laporan", url: "/dashboard/dpl/laporan", icon: IconFileCheck },
+    { title: "Riwayat Verifikasi", url: "#", icon: IconHistory }, // URL untuk masa depan
+  ],
+  navSecondary: [
+    { title: "Pengaturan", url: "#", icon: IconSettings },
+    { title: "Bantuan", url: "#", icon: IconHelp },
+  ],
+};
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const [menuData, setMenuData] = React.useState(dataMahasiswa); // Default ke mahasiswa
+
+  React.useEffect(() => {
+    const user = pb.authStore.model;
+    if (user?.role === 'dpl') {
+      setMenuData(dataDpl);
+    } else {
+      setMenuData(dataMahasiswa);
+    }
+  }, []);
+
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
-            >
+            <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
               <a href="/dashboard">
                 <IconBuildingCommunity className="!size-5" />
                 <span className="text-base font-semibold">LPPM IAI Persis</span>
@@ -75,9 +79,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {/* Menggunakan data menu yang baru */}
-        <NavMain items={dataMahasiswa.navMain} />
-        <NavSecondary items={dataMahasiswa.navSecondary} className="mt-auto" />
+        <NavMain items={menuData.navMain} />
+        <NavSecondary items={menuData.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
