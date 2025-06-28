@@ -5,13 +5,29 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { IconFileText, IconEye, IconPencil, IconTrash } from '@tabler/icons-react';
+import { IconFileText, IconEye, IconPencil, IconTrash, IconDownload } from '@tabler/icons-react';
 import { toast } from "sonner";
 
+// Tipe data yang diperluas untuk mencakup relasi
+interface Anggota {
+  nama: string;
+  nim: string;
+  prodi: string;
+}
+interface Kelompok extends RecordModel {
+    anggota: Anggota[];
+    expand?: {
+        ketua: {
+            nama_lengkap: string;
+        }
+    }
+}
 interface Laporan extends RecordModel {
     judul_kegiatan: string;
     tanggal_kegiatan: string;
@@ -26,6 +42,7 @@ interface Laporan extends RecordModel {
 export default function LaporanListPage() {
   const router = useRouter();
   const [laporans, setLaporans] = useState<Laporan[]>([]);
+  const [kelompok, setKelompok] = useState<Kelompok | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchLaporan = useCallback(async (signal?: AbortSignal) => {
@@ -36,7 +53,8 @@ export default function LaporanListPage() {
     }
     setIsLoading(true);
     try {
-      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal });
+      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'ketua' });
+      setKelompok(kelompokRecord);
       
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
           filter: `kelompok.id="${kelompokRecord.id}"`,
@@ -69,18 +87,51 @@ export default function LaporanListPage() {
           try {
             await pb.collection('laporans').delete(laporanId);
             toast.success("Laporan berhasil dihapus.");
-            fetchLaporan(); // Muat ulang data setelah menghapus
+            fetchLaporan();
           } catch (error) {
             console.error("Gagal menghapus laporan:", error);
             toast.error("Gagal menghapus laporan.");
           }
         },
       },
-      cancel: {
-        label: "Batal",
-        onClick: () => {},
-      },
+      cancel: { label: "Batal", onClick: () => {} },
     });
+  };
+
+  const handleDownloadPDF = () => {
+    if (!kelompok) return;
+    const doc = new jsPDF();
+
+    // Judul Dokumen
+    doc.setFontSize(18);
+    doc.text("Rekapitulasi Laporan Penelitian Mahasiswa", 14, 22);
+    doc.setFontSize(12);
+    doc.text("LPPM IAI Persis Garut", 14, 30);
+
+    // Informasi Kelompok
+    doc.setFontSize(11);
+    doc.text(`Ketua Kelompok: ${kelompok.expand?.ketua.nama_lengkap || 'Tidak ada data'}`, 14, 45);
+    doc.text("Anggota Kelompok:", 14, 52);
+    
+    const anggotaText = kelompok.anggota.map((anggota, index) => `${index + 1}. ${anggota.nama} (${anggota.nim})`);
+    doc.text(anggotaText, 18, 59);
+
+    // Tabel Laporan
+    autoTable(doc, {
+        startY: 60 + (anggotaText.length * 7),
+        head: [['No', 'Judul Kegiatan', 'Bidang', 'Tanggal', 'Status']],
+        body: laporans.map((laporan, index) => [
+            index + 1,
+            laporan.judul_kegiatan,
+            laporan.expand?.bidang_penelitian?.nama_bidang || '-',
+            new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID'),
+            laporan.status,
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [22, 163, 74] },
+    });
+
+    doc.save(`rekap-laporan-${kelompok.expand?.ketua.nama_lengkap || 'kelompok'}.pdf`);
   };
 
   const getStatusBadgeVariant = (status: Laporan['status']): "default" | "secondary" | "destructive" | "outline" => {
@@ -100,9 +151,16 @@ export default function LaporanListPage() {
             <CardTitle className="flex items-center gap-2"><IconFileText />Daftar Laporan Penelitian</CardTitle>
             <CardDescription>Lihat, edit, atau hapus laporan yang telah Anda buat.</CardDescription>
           </div>
-          <Link href="/dashboard/mahasiswa/laporan/baru">
-            <Button>Buat Laporan Baru</Button>
-          </Link>
+          <div className="flex gap-2">
+            {/* Diperbarui: Tombol untuk download PDF */}
+            <Button variant="outline" onClick={handleDownloadPDF} disabled={isLoading || laporans.length === 0}>
+              <IconDownload className="mr-2 h-4 w-4" />
+              Download Rekap
+            </Button>
+            <Link href="/dashboard/mahasiswa/laporan/baru">
+              <Button>Buat Laporan Baru</Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
@@ -128,10 +186,7 @@ export default function LaporanListPage() {
                       <TableCell><Badge variant={getStatusBadgeVariant(laporan.status)}>{laporan.status}</Badge></TableCell>
                       <TableCell className="text-right space-x-2">
                         <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}`}><Button variant="outline" size="icon"><IconEye className="h-4 w-4" /></Button></Link>
-                        {/* Diperbaiki: Tombol Edit sekarang aktif dan menautkan ke halaman edit */}
-                        <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}/edit`}>
-                          <Button variant="outline" size="icon"><IconPencil className="h-4 w-4" /></Button>
-                        </Link>
+                        <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}/edit`}><Button variant="outline" size="icon"><IconPencil className="h-4 w-4" /></Button></Link>
                         <Button variant="destructive" size="icon" onClick={() => handleDelete(laporan.id, laporan.judul_kegiatan)}><IconTrash className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
