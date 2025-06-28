@@ -49,6 +49,7 @@ export default function KelolaAnggotaPage() {
       } catch (error) {
         if (error instanceof ClientResponseError && error.status === 404) {
           // Handle jika kelompok belum ada
+          console.warn("Kelompok belum dibuat untuk pengguna ini.");
         }
       } finally {
         setIsLoading(false);
@@ -69,6 +70,8 @@ export default function KelolaAnggotaPage() {
       toast.success("Anggota berhasil ditambahkan!");
       setNama(''); setNim(''); setProdi('');
     } catch (error) {
+      // Diperbaiki: Menambahkan console.error untuk menggunakan variabel 'error'
+      console.error("Gagal menambah anggota:", error);
       toast.error("Gagal menambah anggota.");
     }
   };
@@ -82,6 +85,8 @@ export default function KelolaAnggotaPage() {
       setAnggota(updatedAnggotaList);
       toast.success("Anggota berhasil dihapus.");
     } catch (error) {
+      // Diperbaiki: Menambahkan console.error untuk menggunakan variabel 'error'
+      console.error("Gagal menghapus anggota:", error);
       toast.error("Gagal menghapus anggota.");
     }
   };
