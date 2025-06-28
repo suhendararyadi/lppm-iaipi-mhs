@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-// import { useRouter } from 'next/navigation'; // Dihapus karena tidak digunakan
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,8 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { IconUsers, IconUserPlus, IconEdit, IconTrash } from '@tabler/icons-react';
 import { toast } from "sonner";
-// Kita akan membuat komponen ini nanti
-// import { UserFormDialog } from './user-form-dialog'; 
+import { UserFormDialog } from './user-form-dialog'; 
 
 interface User extends RecordModel {
     nama_lengkap: string;
@@ -20,9 +18,10 @@ interface User extends RecordModel {
 }
 
 export default function LppmUserManagementPage() {
-  // const router = useRouter(); // Dihapus karena tidak digunakan
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<RecordModel | null>(null);
 
   const fetchUsers = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
@@ -48,6 +47,11 @@ export default function LppmUserManagementPage() {
     return () => controller.abort();
   }, [fetchUsers]);
 
+  const handleOpenDialog = (user: RecordModel | null = null) => {
+    setEditingUser(user);
+    setIsDialogOpen(true);
+  };
+
   const handleDelete = (userId: string, userName: string) => {
     toast.error(`Apakah Anda yakin ingin menghapus pengguna "${userName}"?`, {
       action: {
@@ -58,13 +62,11 @@ export default function LppmUserManagementPage() {
             toast.success("Pengguna berhasil dihapus.");
             fetchUsers();
           } catch (error) {
-            // Diperbaiki: Menambahkan console.error untuk menggunakan variabel 'error'
             console.error("Gagal menghapus pengguna:", error);
             toast.error("Gagal menghapus pengguna.");
           }
         },
       },
-      // Diperbaiki: Menambahkan onClick handler kosong untuk memenuhi tipe data
       cancel: { label: "Batal", onClick: () => {} },
     });
   };
@@ -77,8 +79,7 @@ export default function LppmUserManagementPage() {
             <CardTitle className="flex items-center gap-2"><IconUsers />Manajemen Pengguna</CardTitle>
             <CardDescription>Tambah, edit, atau hapus data pengguna Mahasiswa dan DPL.</CardDescription>
           </div>
-          {/* Tombol Tambah Pengguna akan kita fungsikan nanti */}
-          <Button><IconUserPlus className="mr-2 h-4 w-4" /> Tambah Pengguna</Button>
+          <Button onClick={() => handleOpenDialog()}><IconUserPlus className="mr-2 h-4 w-4" /> Tambah Pengguna</Button>
         </CardHeader>
         <CardContent>
           <div className="border rounded-lg overflow-hidden">
@@ -99,10 +100,13 @@ export default function LppmUserManagementPage() {
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.nama_lengkap}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell><Badge variant={user.role === 'dpl' ? 'secondary' : 'outline'}>{user.role}</Badge></TableCell>
+                      <TableCell><Badge variant={user.role === 'dpl' ? 'secondary' : user.role === 'lppm' ? 'default' : 'outline'}>{user.role}</Badge></TableCell>
                       <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon"><IconEdit className="h-4 w-4" /></Button>
-                        <Button variant="destructive" size="icon" onClick={() => handleDelete(user.id, user.nama_lengkap)}><IconTrash className="h-4 w-4" /></Button>
+                        {/* Diperbaiki: Menambahkan onClick handler untuk tombol Edit */}
+                        <Button variant="outline" size="icon" onClick={() => handleOpenDialog(user)}><IconEdit className="h-4 w-4" /></Button>
+                        {pb.authStore.model?.id !== user.id && ( // Jangan biarkan admin menghapus dirinya sendiri
+                            <Button variant="destructive" size="icon" onClick={() => handleDelete(user.id, user.nama_lengkap)}><IconTrash className="h-4 w-4" /></Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -114,6 +118,13 @@ export default function LppmUserManagementPage() {
           </div>
         </CardContent>
       </Card>
+      
+      <UserFormDialog 
+        isOpen={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        onFormSubmit={fetchUsers}
+        user={editingUser}
+      />
     </main>
   );
 }
