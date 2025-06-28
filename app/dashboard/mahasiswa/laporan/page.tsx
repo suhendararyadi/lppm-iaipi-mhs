@@ -37,11 +37,12 @@ export default function LaporanListPage() {
     setIsLoading(true);
     try {
       const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal });
+      
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
           filter: `kelompok.id="${kelompokRecord.id}"`,
           sort: '-tanggal_kegiatan',
           expand: 'bidang_penelitian',
-          signal,
+          signal: signal,
       });
       setLaporans(laporanList);
     } catch (error) {
@@ -70,7 +71,6 @@ export default function LaporanListPage() {
             toast.success("Laporan berhasil dihapus.");
             fetchLaporan(); // Muat ulang data setelah menghapus
           } catch (error) {
-            // Diperbaiki: Menambahkan console.error untuk menggunakan variabel 'error'
             console.error("Gagal menghapus laporan:", error);
             toast.error("Gagal menghapus laporan.");
           }
@@ -128,7 +128,10 @@ export default function LaporanListPage() {
                       <TableCell><Badge variant={getStatusBadgeVariant(laporan.status)}>{laporan.status}</Badge></TableCell>
                       <TableCell className="text-right space-x-2">
                         <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}`}><Button variant="outline" size="icon"><IconEye className="h-4 w-4" /></Button></Link>
-                        <Button variant="outline" size="icon" disabled><IconPencil className="h-4 w-4" /></Button>
+                        {/* Diperbaiki: Tombol Edit sekarang aktif dan menautkan ke halaman edit */}
+                        <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}/edit`}>
+                          <Button variant="outline" size="icon"><IconPencil className="h-4 w-4" /></Button>
+                        </Link>
                         <Button variant="destructive" size="icon" onClick={() => handleDelete(laporan.id, laporan.judul_kegiatan)}><IconTrash className="h-4 w-4" /></Button>
                       </TableCell>
                     </TableRow>
