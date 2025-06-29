@@ -3,11 +3,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { IconUsers, IconFileText, IconBooks, IconUserCheck } from '@tabler/icons-react';
 import { toast } from "sonner";
 import { Skeleton } from '@/components/ui/skeleton';
-import { LaporanHarianChart } from './laporan-chart'; // Diperbarui: Menggunakan nama komponen baru
+import { LaporanHarianChart } from './laporan-chart';
 
 interface Stats {
   totalUsers: number;
@@ -34,29 +34,32 @@ export default function LppmDashboardPage() {
   const [laporanData, setLaporanData] = useState<RecordModel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Diperbaiki: Logika pengambilan data dioptimalkan untuk mengurangi jumlah permintaan ke server.
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const results = await Promise.allSettled([
-        pb.collection('users').getList(1, 1, { filter: 'role != "lppm"', signal }),
-        pb.collection('users').getList(1, 1, { filter: 'role = "mahasiswa"', signal }),
-        pb.collection('users').getList(1, 1, { filter: 'role = "dpl"', signal }),
+      // 1. Ambil semua data yang diperlukan dalam beberapa permintaan efisien
+      const [allUsers, laporans, bidangData] = await Promise.all([
+        pb.collection('users').getFullList<RecordModel>({ filter: 'role != "lppm"', signal }),
         pb.collection('laporans').getFullList({ sort: '-created', signal }),
         pb.collection('bidang_penelitian').getList(1, 1, { signal }),
       ]);
 
-      const newStats: Stats = {
-        totalUsers: results[0].status === 'fulfilled' ? results[0].value.totalItems : 0,
-        totalMahasiswa: results[1].status === 'fulfilled' ? results[1].value.totalItems : 0,
-        totalDpl: results[2].status === 'fulfilled' ? results[2].value.totalItems : 0,
-        totalLaporan: results[3].status === 'fulfilled' ? results[3].value.length : 0,
-        totalBidang: results[4].status === 'fulfilled' ? results[4].value.totalItems : 0,
-      };
-      setStats(newStats);
+      // 2. Hitung statistik dari data yang sudah diambil di sisi klien
+      const totalMahasiswa = allUsers.filter(user => user.role === 'mahasiswa').length;
+      const totalDpl = allUsers.filter(user => user.role === 'dpl').length;
 
-      if (results[3].status === 'fulfilled') {
-        setLaporanData(results[3].value);
-      }
+      // 3. Atur state dengan data yang sudah dihitung
+      setStats({
+        totalUsers: allUsers.length,
+        totalMahasiswa: totalMahasiswa,
+        totalDpl: totalDpl,
+        totalLaporan: laporans.length,
+        totalBidang: bidangData.totalItems,
+      });
+
+      // 4. Simpan data laporan untuk grafik
+      setLaporanData(laporans);
       
     } catch (error) {
         if (!(error instanceof ClientResponseError && error.isAbort)) {

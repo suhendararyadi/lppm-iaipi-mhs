@@ -121,10 +121,6 @@ export function NavUser() {
                 Profil Saya
               </DropdownMenuItem>
               <DropdownMenuItem disabled>
-                <IconCreditCard />
-                Tagihan
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
                 <IconNotification />
                 Notifikasi
               </DropdownMenuItem>

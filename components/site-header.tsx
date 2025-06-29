@@ -17,19 +17,7 @@ export function SiteHeader() {
             <IconBook className="h-5 w-5 text-muted-foreground" />
             <h1 className="text-base font-semibold">Laporan Penelitian Mahasiswa</h1>
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          {/* Tombol GitHub bisa Anda hapus jika tidak diperlukan */}
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
-            <a
-              href="https://github.com/suhendararyadi/lppm-iaipi-mhs"
-              rel="noopener noreferrer"
-              target="_blank"
-              className="dark:text-foreground"
-            >
-              GitHub
-            </a>
-          </Button>
-        </div>
+        
       </div>
     </header>
   )
