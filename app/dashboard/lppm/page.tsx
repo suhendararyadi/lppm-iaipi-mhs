@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { IconUsers, IconFileText, IconBooks, IconUserCheck } from '@tabler/icons-react';
 import { toast } from "sonner";
 import { Skeleton } from '@/components/ui/skeleton';
-import { LaporanChart } from './laporan-chart';
+import { LaporanHarianChart } from './laporan-chart'; // Diperbarui: Menggunakan nama komponen baru
 
 interface Stats {
   totalUsers: number;
@@ -41,7 +41,7 @@ export default function LppmDashboardPage() {
         pb.collection('users').getList(1, 1, { filter: 'role != "lppm"', signal }),
         pb.collection('users').getList(1, 1, { filter: 'role = "mahasiswa"', signal }),
         pb.collection('users').getList(1, 1, { filter: 'role = "dpl"', signal }),
-        pb.collection('laporans').getFullList({ sort: '-created', signal }), // Ambil semua laporan untuk chart
+        pb.collection('laporans').getFullList({ sort: '-created', signal }),
         pb.collection('bidang_penelitian').getList(1, 1, { signal }),
       ]);
 
@@ -49,7 +49,6 @@ export default function LppmDashboardPage() {
         totalUsers: results[0].status === 'fulfilled' ? results[0].value.totalItems : 0,
         totalMahasiswa: results[1].status === 'fulfilled' ? results[1].value.totalItems : 0,
         totalDpl: results[2].status === 'fulfilled' ? results[2].value.totalItems : 0,
-        // Diperbaiki: getFullList mengembalikan array, jadi kita gunakan .length
         totalLaporan: results[3].status === 'fulfilled' ? results[3].value.length : 0,
         totalBidang: results[4].status === 'fulfilled' ? results[4].value.totalItems : 0,
       };
@@ -61,7 +60,7 @@ export default function LppmDashboardPage() {
       
     } catch (error) {
         if (!(error instanceof ClientResponseError && error.isAbort)) {
-            console.error("Gagal memuat data statistik:", error)
+            console.error("Gagal memuat data statistik:", error);
             toast.error("Gagal memuat data statistik.");
         }
     } finally {
@@ -75,20 +74,31 @@ export default function LppmDashboardPage() {
     return () => controller.abort();
   }, [fetchData]);
 
-  // Proses data laporan untuk format chart
+  // Diperbarui: Proses data laporan untuk format harian (30 hari terakhir)
   const chartData = useMemo(() => {
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
-    const monthlyCounts = Array(12).fill(0);
+    const dailyCounts: { [key: string]: number } = {};
+    const today = new Date();
+    
+    // Inisialisasi 30 hari terakhir dengan 0 laporan
+    for (let i = 0; i < 30; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i);
+        const dateString = date.toISOString().split('T')[0]; // Format YYYY-MM-DD
+        dailyCounts[dateString] = 0;
+    }
 
+    // Hitung laporan untuk setiap hari
     laporanData.forEach(laporan => {
-      const month = new Date(laporan.created).getMonth();
-      monthlyCounts[month]++;
+      const dateString = new Date(laporan.created).toISOString().split('T')[0];
+      if (dateString in dailyCounts) {
+        dailyCounts[dateString]++;
+      }
     });
 
-    return monthNames.map((month, index) => ({
-      month,
-      total: monthlyCounts[index] || 0,
-    }));
+    // Ubah menjadi format array yang bisa dibaca chart dan urutkan
+    return Object.entries(dailyCounts)
+        .map(([date, total]) => ({ date, total }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [laporanData]);
 
   return (
@@ -107,8 +117,7 @@ export default function LppmDashboardPage() {
       </div>
 
       <div className="mt-4">
-        {/* Diperbarui: Menampilkan komponen chart dengan data */}
-        <LaporanChart data={chartData} />
+        <LaporanHarianChart data={chartData} />
       </div>
     </main>
   );

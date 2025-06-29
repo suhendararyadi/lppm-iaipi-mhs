@@ -15,8 +15,9 @@ import {
 } from "@/components/ui/chart"
 import { type ChartConfig } from "@/components/ui/chart"
 
-interface LaporanChartProps {
-  data: { month: string; total: number }[];
+// Diperbarui: Tipe data untuk aktivitas harian
+interface LaporanHarianChartProps {
+  data: { date: string; total: number }[];
 }
 
 const chartConfig = {
@@ -26,23 +27,24 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-export function LaporanChart({ data }: LaporanChartProps) {
+export function LaporanHarianChart({ data }: LaporanHarianChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Aktivitas Laporan Tahunan</CardTitle>
-        <CardDescription>Jumlah laporan yang dibuat setiap bulan</CardDescription>
+        <CardTitle>Aktivitas Laporan Harian</CardTitle>
+        <CardDescription>Jumlah laporan yang dibuat dalam 30 hari terakhir</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
           <BarChart accessibilityLayer data={data}>
             <CartesianGrid vertical={false} />
             <XAxis
-              dataKey="month"
+              dataKey="date"
               tickLine={false}
               tickMargin={10}
               axisLine={false}
-              tickFormatter={(value) => value.slice(0, 3)}
+              // Diperbarui: Formatter untuk menampilkan tanggal saja
+              tickFormatter={(value) => new Date(value).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' })}
             />
             <YAxis />
             <ChartTooltip
