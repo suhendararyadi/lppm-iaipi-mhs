@@ -5,8 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { saveAs } from 'file-saver';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -32,23 +32,24 @@ interface LaporanDetail extends RecordModel {
         bidang_penelitian?: {
             nama_bidang: string;
         },
-        // Diperbarui: Menambahkan tipe untuk data kelompok
         kelompok?: {
-            anggota: { nama: string, nim: string, prodi: string }[];
-            expand: {
+            anggota: { nama: string, nim: string, prodiNama: string }[];
+            expand?: {
                 ketua: {
+                    nama_lengkap: string;
+                    nim: string;
+                    expand?: {
+                        prodi: {
+                            nama_prodi: string;
+                        }
+                    }
+                },
+                dpl?: {
                     nama_lengkap: string;
                 }
             }
         }
     }
-}
-
-// Interface untuk jsPDF dengan plugin autoTable
-interface jsPDFWithAutoTable extends jsPDF {
-  lastAutoTable: {
-    finalY: number;
-  };
 }
 
 
@@ -66,9 +67,8 @@ export default function DetailLaporanDplPage() {
     if (!id || typeof id !== 'string') return;
     
     try {
-      // Diperbaiki: Menambahkan 'kelompok' dan 'kelompok.ketua' ke expand
       const record = await pb.collection('laporans').getOne<LaporanDetail>(id, {
-        expand: 'bidang_penelitian,kelompok,kelompok.ketua',
+        expand: 'bidang_penelitian,kelompok,kelompok.ketua,kelompok.dpl,kelompok.ketua.prodi',
         signal,
       });
       setLaporan(record);
@@ -107,53 +107,63 @@ export default function DetailLaporanDplPage() {
         setIsSubmitting(false);
     }
   }
-
-  const handleDownloadPDF = () => {
-    if (!laporan || !laporan.expand?.kelompok || !laporan.expand.kelompok.expand?.ketua) {
-        toast.error("Data laporan belum lengkap untuk membuat PDF.");
+  
+  const handleDownloadDocx = async () => {
+    if (!laporan) {
+        toast.error("Data laporan belum lengkap untuk membuat dokumen.");
         return;
     }
-    const doc = new jsPDF() as jsPDFWithAutoTable;
-    const kelompok = laporan.expand.kelompok;
-    const ketua = kelompok.expand.ketua;
+    
+    const { expand, judul_kegiatan, tanggal_kegiatan, tempat_pelaksanaan, narasumber, status, deskripsi_kegiatan, mahasiswa_terlibat, rencana_tindak_lanjut, catatan_dpl } = laporan;
+    const ketua = expand?.kelompok?.expand?.ketua;
+    const dpl = expand?.kelompok?.expand?.dpl;
+    const anggota = expand?.kelompok?.anggota || [];
+    const prodiKetua = ketua?.expand?.prodi?.nama_prodi || 'N/A';
 
-    const stripHtml = (html: string) => html.replace(/<[^>]*>?/gm, '');
+    const doc = new Document({
+        sections: [{
+            children: [
+                new Paragraph({ text: "LAPORAN KEGIATAN PENELITIAN", heading: "Heading1", alignment: "center" }),
+                new Paragraph({ text: judul_kegiatan, heading: "Heading2", alignment: "center" }),
+                new Paragraph({ text: "" }),
+                
+                new Paragraph({ children: [new TextRun({ text: "Tanggal Kegiatan: ", bold: true }), new TextRun({ text: new Date(tanggal_kegiatan).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) })] }),
+                new Paragraph({ children: [new TextRun({ text: "Bidang Penelitian: ", bold: true }), new TextRun({ text: expand?.bidang_penelitian?.nama_bidang || '-' })] }),
+                new Paragraph({ children: [new TextRun({ text: "Tempat Pelaksanaan: ", bold: true }), new TextRun({ text: tempat_pelaksanaan })] }),
+                new Paragraph({ children: [new TextRun({ text: "Narasumber: ", bold: true }), new TextRun({ text: narasumber || '-' })] }),
+                new Paragraph({ children: [new TextRun({ text: "Status Laporan: ", bold: true }), new TextRun({ text: status })] }),
+                new Paragraph({ text: "" }),
 
-    doc.setFontSize(18);
-    doc.text("Detail Laporan Kegiatan Penelitian", 14, 22);
-    doc.setFontSize(12);
-    doc.text(`Judul: ${laporan.judul_kegiatan}`, 14, 30);
+                new Paragraph({ children: [new TextRun({ text: "Informasi Kelompok", bold: true })] }),
+                new Paragraph({ children: [new TextRun({ text: "Ketua Kelompok: ", bold: true }), new TextRun({ text: `${ketua?.nama_lengkap || 'N/A'} (${ketua?.nim || 'NIM tidak ada'}) - ${prodiKetua}` })] }),
+                new Paragraph({ children: [new TextRun({ text: "DPL: ", bold: true }), new TextRun({ text: dpl?.nama_lengkap || 'Belum Ditugaskan' })] }),
+                new Paragraph({ children: [new TextRun({ text: "Anggota:", bold: true })] }),
+                ...anggota.map(a => new Paragraph({ text: `- ${a.nama} (${a.nim}) - ${a.prodiNama}`, bullet: { level: 0 } })),
+                new Paragraph({ text: "" }),
 
-    autoTable(doc, {
-        startY: 40,
-        head: [['Informasi Kelompok']],
-        body: [
-            ['Ketua', ketua.nama_lengkap],
-            ['Anggota', kelompok.anggota.map(a => `- ${a.nama} (${a.nim})`).join('\n')],
-        ],
-        theme: 'plain',
-        headStyles: { fontStyle: 'bold' },
+                new Paragraph({ children: [new TextRun({ text: "Deskripsi Kegiatan", bold: true })] }),
+                new Paragraph({ text: deskripsi_kegiatan.replace(/<[^>]*>?/gm, '') }),
+                new Paragraph({ text: "" }),
+
+                new Paragraph({ children: [new TextRun({ text: "Mahasiswa Terlibat", bold: true })] }),
+                ...mahasiswa_terlibat.map(nama => new Paragraph({ text: `- ${nama}`, bullet: { level: 0 }})),
+                new Paragraph({ text: "" }),
+
+                new Paragraph({ children: [new TextRun({ text: "Rencana Tindak Lanjut", bold: true })] }),
+                new Paragraph({ text: rencana_tindak_lanjut || '-' }),
+                new Paragraph({ text: "" }),
+
+                ...(catatan_dpl ? [
+                    new Paragraph({ children: [new TextRun({ text: "Catatan Revisi dari DPL", bold: true })] }),
+                    new Paragraph({ children: [new TextRun({ text: catatan_dpl, italics: true })] }),
+                ] : []),
+            ],
+        }],
     });
 
-    autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 10,
-        head: [['Detail Laporan']],
-        body: [
-            ['Tanggal Kegiatan', new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })],
-            ['Bidang Penelitian', laporan.expand?.bidang_penelitian?.nama_bidang || '-'],
-            ['Tempat Pelaksanaan', laporan.tempat_pelaksanaan],
-            ['Narasumber', laporan.narasumber || '-'],
-            ['Unsur Terlibat', laporan.unsur_terlibat || '-'],
-            ['Deskripsi Kegiatan', stripHtml(laporan.deskripsi_kegiatan)],
-            ['Rencana Tindak Lanjut', laporan.rencana_tindak_lanjut || '-'],
-            ['Status', laporan.status],
-        ],
-        theme: 'plain',
-        headStyles: { fontStyle: 'bold' },
-        columnStyles: { 1: { cellWidth: 'auto' } }
-    });
-
-    doc.save(`laporan-${laporan.judul_kegiatan.replace(/ /g, "_")}.pdf`);
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `laporan-${judul_kegiatan.replace(/ /g, "_")}.docx`);
+    toast.success("Dokumen berhasil diunduh!");
   };
 
   if (isLoading) {
@@ -170,14 +180,13 @@ export default function DetailLaporanDplPage() {
         <Link href="/dashboard/dpl">
           <Button variant="outline" size="sm"><IconChevronLeft className="h-4 w-4 mr-1" />Kembali ke Daftar Verifikasi</Button>
         </Link>
-        <Button variant="outline" onClick={handleDownloadPDF}>
+        <Button variant="outline" onClick={handleDownloadDocx}>
             <IconDownload className="mr-2 h-4 w-4" />
-            Download PDF
+            Download DOCX
         </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Kolom Kiri: Detail Laporan */}
         <div className="lg:col-span-2">
             <Card>
                 <CardHeader>
@@ -199,9 +208,15 @@ export default function DetailLaporanDplPage() {
                 </div>
                 <div className="space-y-2"><h3 className="font-semibold">Deskripsi Kegiatan</h3><div className="prose prose-sm max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: laporan.deskripsi_kegiatan }}></div></div>
                 <div className="space-y-2"><h3 className="font-semibold">Rencana Tindak Lanjut</h3><p className="text-muted-foreground">{laporan.rencana_tindak_lanjut || '-'}</p></div>
-                <div className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-2"><h3 className="font-semibold">Mahasiswa Terlibat</h3><ul className="list-disc list-inside text-muted-foreground">{laporan.mahasiswa_terlibat.map((nama, i) => <li key={i}>{nama}</li>)}</ul></div>
-                    <div className="space-y-2"><h3 className="font-semibold">Unsur Luar Terlibat</h3><p className="text-muted-foreground">{laporan.unsur_terlibat || '-'}</p></div>
+                <div className="space-y-2">
+                    <h3 className="font-semibold">Informasi Kelompok</h3>
+                    <div className="text-sm text-muted-foreground pl-4 space-y-1">
+                        <p><strong>Ketua:</strong> {laporan.expand?.kelompok?.expand?.ketua?.nama_lengkap} ({laporan.expand?.kelompok?.expand?.ketua?.nim || 'N/A'}) - {laporan.expand?.kelompok?.expand?.ketua?.expand?.prodi?.nama_prodi || 'N/A'}</p>
+                        <p><strong>Anggota:</strong></p>
+                        <ul className="list-disc list-inside ml-4">
+                            {laporan.expand?.kelompok?.anggota?.map((a, i) => <li key={i}>{a.nama} ({a.nim}) - {a.prodiNama}</li>)}
+                        </ul>
+                    </div>
                 </div>
                 {laporan.dokumen_pendukung && laporan.dokumen_pendukung.length > 0 && (
                     <div className="space-y-2">
@@ -219,7 +234,6 @@ export default function DetailLaporanDplPage() {
             </Card>
         </div>
 
-        {/* Kolom Kanan: Aksi Verifikasi */}
         <div className="lg:col-span-1">
             <Card>
                 <CardHeader>
