@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel } from 'pocketbase';
 import {
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconNotification,
