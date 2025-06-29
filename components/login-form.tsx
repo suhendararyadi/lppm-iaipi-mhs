@@ -10,8 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { pb } from "@/lib/pocketbase"
-import { toast } from "sonner"
-import { Loader2 } from "lucide-react" // Menggunakan ikon spinner
+import { Loader2, CheckCircle2 } from "lucide-react" // Diperbarui: Menambahkan ikon CheckCircle2
 
 export function LoginForm({
   className,
@@ -22,22 +21,19 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notification, setNotification] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError("");
+    setNotification("Login berhasil! Sedang memuat data..."); // Set notifikasi
 
     try {
-      // Dioptimalkan: Menangkap data pengguna yang berhasil login
       const authData = await pb.collection('users').authWithPassword(email, password);
       
-      toast.success("Login berhasil!");
-
-      // Dioptimalkan: Mengambil peran langsung dari data pengguna
       const role = authData.record.role;
 
-      // Dioptimalkan: Mengarahkan langsung ke dasbor yang sesuai
       switch (role) {
         case 'mahasiswa':
           router.push('/dashboard/mahasiswa');
@@ -49,19 +45,19 @@ export function LoginForm({
           router.push('/dashboard/lppm');
           break;
         default:
-          // Fallback jika peran tidak dikenali
           router.push('/dashboard');
           break;
       }
 
     } catch (err: unknown) {
+      setNotification("");
       if (err instanceof ClientResponseError) {
           setError("Gagal masuk. Periksa kembali email dan password Anda.");
       } else {
           setError("Terjadi kesalahan yang tidak diketahui.");
       }
       console.error("Login Error:", err);
-      setIsLoading(false); // Hanya set loading false jika login gagal
+      setIsLoading(false);
     }
   };
 
@@ -109,11 +105,20 @@ export function LoginForm({
                   disabled={isLoading}
                 />
               </div>
+              
+              {/* Diperbarui: Menampilkan notifikasi dengan box hijau dan ikon checklist */}
+              {notification && (
+                <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span>{notification}</span>
+                </div>
+              )}
+
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Memuat...
+                    Mengalihkan...
                   </>
                 ) : "Masuk"}
               </Button>
