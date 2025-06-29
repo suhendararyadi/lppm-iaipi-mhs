@@ -34,20 +34,9 @@ export default function MahasiswaDashboardPage() {
     setIsLoading(true);
 
     try {
-      let kelompokRecord;
-      try {
-        kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal });
-      } catch (error) {
-        if (error instanceof ClientResponseError && error.status === 404) {
-          console.log("Membuat data kelompok baru untuk pengguna...");
-          kelompokRecord = await pb.collection('kelompok_mahasiswa').create({
-            ketua: user.id,
-            anggota: [],
-          }, { signal });
-        } else {
-          throw error;
-        }
-      }
+      // Disesuaikan: Logika pembuatan kelompok otomatis dihapus.
+      // Sekarang hanya mencoba mengambil data kelompok yang sudah ada.
+      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal });
 
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
           filter: `kelompok.id="${kelompokRecord.id}"`,
@@ -57,13 +46,13 @@ export default function MahasiswaDashboardPage() {
       setLaporans(laporanList);
 
     } catch (error) {
-      // Diperbaiki: Menambahkan pengecekan untuk AbortError
       if (error instanceof ClientResponseError && error.isAbort) {
         console.log("Request to fetch dashboard data was aborted.");
         return;
       }
-      console.error("Gagal memuat data dasbor:", error);
-      toast.error("Gagal memuat data dasbor.");
+      // Error ini sekarang wajar jika kelompok belum dibuat oleh admin.
+      console.error("Gagal memuat data dasbor, kelompok mungkin belum dibuat:", error);
+      toast.error("Gagal memuat data dasbor. Hubungi LPPM jika masalah berlanjut.");
     } finally {
       if (!signal?.aborted) {
         setIsLoading(false);
