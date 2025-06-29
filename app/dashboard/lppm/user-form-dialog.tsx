@@ -19,11 +19,11 @@ interface UserFormDialogProps {
   user?: RecordModel | null;
 }
 
-// Diperbaiki: Menambahkan interface untuk payload data pengguna
 interface UserPayload {
   nama_lengkap: string;
   email: string;
   role: string;
+  prodi?: string; // Prodi bersifat opsional di sini
   password?: string;
   passwordConfirm?: string;
 }
@@ -31,24 +31,32 @@ interface UserPayload {
 export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: UserFormDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [dplList, setDplList] = useState<RecordModel[]>([]);
+  const [prodiList, setProdiList] = useState<RecordModel[]>([]); // State baru untuk daftar prodi
   const [selectedRole, setSelectedRole] = useState(user?.role || '');
   const [selectedDpl, setSelectedDpl] = useState('');
+  const [selectedProdi, setSelectedProdi] = useState(user?.prodi || ''); // State baru untuk prodi terpilih
   const isEditMode = !!user;
 
   useEffect(() => {
     if (isOpen) {
-      const fetchDpls = async () => {
+      const fetchData = async () => {
         try {
-          const dpls = await pb.collection('users').getFullList({ filter: 'role = "dpl"' });
+          // Mengambil daftar DPL dan Prodi secara bersamaan
+          const [dpls, prodis] = await Promise.all([
+            pb.collection('users').getFullList({ filter: 'role = "dpl"' }),
+            pb.collection('program_studi').getFullList({ sort: 'nama_prodi' })
+          ]);
           setDplList(dpls);
+          setProdiList(prodis);
         } catch (error) {
-          console.error("Gagal memuat daftar DPL:", error);
-          toast.error("Gagal memuat daftar DPL.");
+          console.error("Gagal memuat data DPL/Prodi:", error);
+          toast.error("Gagal memuat data DPL atau Prodi.");
         }
       };
       
-      fetchDpls();
+      fetchData();
       setSelectedRole(user?.role || '');
+      setSelectedProdi(user?.prodi || '');
       setSelectedDpl('');
     }
   }, [isOpen, user]);
@@ -63,12 +71,21 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
     const passwordConfirm = (form.elements.namedItem('passwordConfirm') as HTMLInputElement).value;
 
-    // Diperbaiki: Menggunakan interface UserPayload untuk tipe yang kuat
     const userData: UserPayload = {
         nama_lengkap,
         email,
         role: selectedRole,
     };
+
+    // Tambahkan prodi jika peran adalah mahasiswa
+    if (selectedRole === 'mahasiswa') {
+        if (!selectedProdi) {
+            toast.error("Silakan pilih prodi untuk mahasiswa.");
+            setIsLoading(false);
+            return;
+        }
+        userData.prodi = selectedProdi;
+    }
 
     if (!isEditMode || password) {
         if (password !== passwordConfirm) {
@@ -148,6 +165,23 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
                 </SelectContent>
             </Select>
           </div>
+          {/* Diperbarui: Tampilkan field Prodi jika peran mahasiswa dipilih */}
+          {selectedRole === 'mahasiswa' && (
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="prodi" className="text-right">Prodi</Label>
+                <Select name="prodi" defaultValue={user?.prodi} onValueChange={setSelectedProdi} required>
+                    <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Pilih prodi..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {prodiList.map(prodi => (
+                            <SelectItem key={prodi.id} value={prodi.id}>{prodi.nama_prodi}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+          )}
+          {/* Tampilkan field DPL hanya jika membuat mahasiswa baru */}
           {selectedRole === 'mahasiswa' && !isEditMode && (
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="dpl" className="text-right">DPL</Label>

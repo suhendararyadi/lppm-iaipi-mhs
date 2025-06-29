@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,9 +31,26 @@ interface LaporanDetail extends RecordModel {
     expand?: {
         bidang_penelitian?: {
             nama_bidang: string;
+        },
+        // Diperbarui: Menambahkan tipe untuk data kelompok
+        kelompok?: {
+            anggota: { nama: string, nim: string, prodi: string }[];
+            expand: {
+                ketua: {
+                    nama_lengkap: string;
+                }
+            }
         }
     }
 }
+
+// Interface untuk jsPDF dengan plugin autoTable
+interface jsPDFWithAutoTable extends jsPDF {
+  lastAutoTable: {
+    finalY: number;
+  };
+}
+
 
 export default function DetailLaporanDplPage() {
   const router = useRouter();
@@ -47,8 +66,9 @@ export default function DetailLaporanDplPage() {
     if (!id || typeof id !== 'string') return;
     
     try {
+      // Diperbaiki: Menambahkan 'kelompok' dan 'kelompok.ketua' ke expand
       const record = await pb.collection('laporans').getOne<LaporanDetail>(id, {
-        expand: 'bidang_penelitian',
+        expand: 'bidang_penelitian,kelompok,kelompok.ketua',
         signal,
       });
       setLaporan(record);
@@ -88,6 +108,54 @@ export default function DetailLaporanDplPage() {
     }
   }
 
+  const handleDownloadPDF = () => {
+    if (!laporan || !laporan.expand?.kelompok || !laporan.expand.kelompok.expand?.ketua) {
+        toast.error("Data laporan belum lengkap untuk membuat PDF.");
+        return;
+    }
+    const doc = new jsPDF() as jsPDFWithAutoTable;
+    const kelompok = laporan.expand.kelompok;
+    const ketua = kelompok.expand.ketua;
+
+    const stripHtml = (html: string) => html.replace(/<[^>]*>?/gm, '');
+
+    doc.setFontSize(18);
+    doc.text("Detail Laporan Kegiatan Penelitian", 14, 22);
+    doc.setFontSize(12);
+    doc.text(`Judul: ${laporan.judul_kegiatan}`, 14, 30);
+
+    autoTable(doc, {
+        startY: 40,
+        head: [['Informasi Kelompok']],
+        body: [
+            ['Ketua', ketua.nama_lengkap],
+            ['Anggota', kelompok.anggota.map(a => `- ${a.nama} (${a.nim})`).join('\n')],
+        ],
+        theme: 'plain',
+        headStyles: { fontStyle: 'bold' },
+    });
+
+    autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 10,
+        head: [['Detail Laporan']],
+        body: [
+            ['Tanggal Kegiatan', new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })],
+            ['Bidang Penelitian', laporan.expand?.bidang_penelitian?.nama_bidang || '-'],
+            ['Tempat Pelaksanaan', laporan.tempat_pelaksanaan],
+            ['Narasumber', laporan.narasumber || '-'],
+            ['Unsur Terlibat', laporan.unsur_terlibat || '-'],
+            ['Deskripsi Kegiatan', stripHtml(laporan.deskripsi_kegiatan)],
+            ['Rencana Tindak Lanjut', laporan.rencana_tindak_lanjut || '-'],
+            ['Status', laporan.status],
+        ],
+        theme: 'plain',
+        headStyles: { fontStyle: 'bold' },
+        columnStyles: { 1: { cellWidth: 'auto' } }
+    });
+
+    doc.save(`laporan-${laporan.judul_kegiatan.replace(/ /g, "_")}.pdf`);
+  };
+
   if (isLoading) {
     return <main className="flex-1 p-6"><div className="flex h-full items-center justify-center">Memuat detail laporan...</div></main>;
   }
@@ -98,10 +166,14 @@ export default function DetailLaporanDplPage() {
 
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-6 grid gap-6">
-      <div className="mb-6">
+      <div className="mb-6 flex justify-between items-center">
         <Link href="/dashboard/dpl">
           <Button variant="outline" size="sm"><IconChevronLeft className="h-4 w-4 mr-1" />Kembali ke Daftar Verifikasi</Button>
         </Link>
+        <Button variant="outline" onClick={handleDownloadPDF}>
+            <IconDownload className="mr-2 h-4 w-4" />
+            Download PDF
+        </Button>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
