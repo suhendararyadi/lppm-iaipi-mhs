@@ -39,7 +39,6 @@ export default function BuatLaporanPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
 
-  // Fetch data awal (bidang penelitian dan data kelompok)
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     const user = pb.authStore.model;
     if (!user) {
@@ -57,7 +56,6 @@ export default function BuatLaporanPage() {
       setKelompok(kelompokData);
 
     } catch (error) {
-      // Diperbaiki: Menambahkan pengecekan untuk AbortError
       if (error instanceof ClientResponseError && error.isAbort) {
         console.log("Request to fetch form data was aborted.");
         return;
@@ -83,6 +81,16 @@ export default function BuatLaporanPage() {
     setMahasiswaTerlibat(prev =>
       prev.includes(nama) ? prev.filter(n => n !== nama) : [...prev, nama]
     );
+  };
+
+  // Diperbarui: Fungsi untuk menangani "Ceklis Semua"
+  const handleSelectAllChange = (checked: boolean | 'indeterminate') => {
+    if (checked === true) {
+      const allMemberNames = kelompok?.anggota.map(a => a.nama) || [];
+      setMahasiswaTerlibat(allMemberNames);
+    } else {
+      setMahasiswaTerlibat([]);
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -176,13 +184,32 @@ export default function BuatLaporanPage() {
               <div className="grid gap-4">
                  <div>
                   <Label>Mahasiswa yang Terlibat</Label>
-                  <div className="p-3 border rounded-md grid grid-cols-2 gap-2">
-                    {kelompok?.anggota.map((anggota, index) => (
-                       <div key={index} className="flex items-center gap-2">
-                         <Checkbox id={`anggota-${index}`} onCheckedChange={() => handleCheckboxChange(anggota.nama)} />
-                         <Label htmlFor={`anggota-${index}`} className="font-normal">{anggota.nama}</Label>
-                       </div>
-                    ))}
+                  <div className="p-3 border rounded-md space-y-2">
+                    {/* Diperbarui: Menambahkan checkbox "Ceklis Semua" */}
+                    <div className="flex items-center space-x-2 border-b pb-2 mb-2">
+                        <Checkbox
+                            id="select-all-anggota"
+                            checked={
+                                kelompok?.anggota.length ? mahasiswaTerlibat.length === kelompok?.anggota.length : false
+                            }
+                            onCheckedChange={handleSelectAllChange}
+                        />
+                        <Label htmlFor="select-all-anggota" className="font-semibold">
+                            Pilih Semua Anggota
+                        </Label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                        {kelompok?.anggota.map((anggota, index) => (
+                           <div key={index} className="flex items-center gap-2">
+                             <Checkbox 
+                                id={`anggota-${index}`}
+                                checked={mahasiswaTerlibat.includes(anggota.nama)}
+                                onCheckedChange={() => handleCheckboxChange(anggota.nama)} 
+                             />
+                             <Label htmlFor={`anggota-${index}`} className="font-normal">{anggota.nama}</Label>
+                           </div>
+                        ))}
+                    </div>
                   </div>
                 </div>
                  <div>

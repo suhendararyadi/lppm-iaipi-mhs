@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { type Icon } from "@tabler/icons-react"
+import { type Icon, IconPlus } from "@tabler/icons-react" // Menambahkan IconPlus
 
 import {
   SidebarGroup,
@@ -26,16 +26,18 @@ export function NavMain({
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
-        {/* Tombol Quick Create tidak perlu diubah karena bukan link navigasi */}
+        {/* Diperbarui: Mengubah Quick Create menjadi Buat Laporan */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              tooltip="Quick Create"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
-            >
-              {/* Anda bisa menambahkan ikon di sini jika perlu */}
-              <span>Quick Create</span>
-            </SidebarMenuButton>
+            <Link href="/dashboard/mahasiswa/laporan/baru" className="w-full">
+              <SidebarMenuButton
+                tooltip="Buat Laporan Baru"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground min-w-8 duration-200 ease-linear"
+              >
+                <IconPlus className="h-5 w-5" />
+                <span>Buat Laporan</span>
+              </SidebarMenuButton>
+            </Link>
           </SidebarMenuItem>
         </SidebarMenu>
 
@@ -43,14 +45,13 @@ export function NavMain({
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              {/* Bungkus tombol dengan Link dan tambahkan prop asChild */}
               <Link href={item.url}>
                 <SidebarMenuButton 
                   asChild 
                   tooltip={item.title}
-                  isActive={pathname === item.url} // Menyorot menu yang aktif
+                  isActive={pathname === item.url}
                 >
-                  <div> {/* Div diperlukan saat menggunakan asChild */}
+                  <div>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
                   </div>
