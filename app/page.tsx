@@ -1,7 +1,7 @@
+"use client"
+
 import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-// import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ArrowRight, BookCheck, FileUp, ShieldCheck } from 'lucide-react';
 
 // Komponen untuk Header
@@ -46,13 +46,41 @@ const HeroSection = () => (
             </Link>
           </div>
         </div>
-        <Image
-          src="https://placehold.co/1200x900/e2e8f0/64748b?text=Tampilan+Dasbor"
-          width={600}
-          height={450}
-          alt="Tampilan Dasbor Aplikasi"
-          className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full"
-        />
+        {/* Diperbarui: Mengganti gambar dengan ilustrasi SVG */}
+        <div className="flex items-center justify-center">
+            <div className="relative w-full max-w-md">
+                <div className="absolute -top-4 -left-4 w-72 h-72 bg-green-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob dark:bg-green-800"></div>
+                <div className="absolute -bottom-4 -right-4 w-72 h-72 bg-sky-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob animation-delay-2000 dark:bg-sky-800"></div>
+                <div className="relative p-4 bg-background/60 backdrop-blur-md rounded-xl border">
+                    <div className="p-6 bg-muted/50 rounded-lg">
+                        <div className="flex justify-between items-center mb-4">
+                            <span className="text-xs font-semibold text-muted-foreground">Dasbor Anda</span>
+                            <div className="flex space-x-1.5">
+                                <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                                <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                            </div>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center"><FileUp className="w-5 h-5 text-primary" /></div>
+                                <div className="flex-1 space-y-1">
+                                    <div className="w-3/4 h-3 bg-muted-foreground/20 rounded-md"></div>
+                                    <div className="w-1/2 h-2 bg-muted-foreground/10 rounded-md"></div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-primary/20 rounded-lg flex items-center justify-center"><BookCheck className="w-5 h-5 text-primary" /></div>
+                                <div className="flex-1 space-y-1">
+                                    <div className="w-4/5 h-3 bg-muted-foreground/20 rounded-md"></div>
+                                    <div className="w-2/3 h-2 bg-muted-foreground/10 rounded-md"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
   </section>

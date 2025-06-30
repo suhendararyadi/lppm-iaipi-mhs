@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
 import { ClientResponseError } from 'pocketbase'
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -10,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { pb } from "@/lib/pocketbase"
-import { Loader2, CheckCircle2 } from "lucide-react" // Diperbarui: Menambahkan ikon CheckCircle2
+import { Loader2, CheckCircle2, BookCheck } from "lucide-react" // Menambahkan ikon BookCheck
 
 export function LoginForm({
   className,
@@ -27,7 +26,7 @@ export function LoginForm({
     e.preventDefault();
     setIsLoading(true);
     setError("");
-    setNotification("Login berhasil! Sedang memuat data..."); // Set notifikasi
+    setNotification("Login berhasil! Sedang mengalihkan ke dasbor...");
 
     try {
       const authData = await pb.collection('users').authWithPassword(email, password);
@@ -106,7 +105,6 @@ export function LoginForm({
                 />
               </div>
               
-              {/* Diperbarui: Menampilkan notifikasi dengan box hijau dan ikon checklist */}
               {notification && (
                 <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:bg-green-950 dark:border-green-800 dark:text-green-200">
                   <CheckCircle2 className="h-5 w-5" />
@@ -164,15 +162,37 @@ export function LoginForm({
               </div>
             </div>
           </form>
-          <div className="bg-muted relative hidden md:block">
-            <Image
-              src="https://placehold.co/800x600/e2e8f0/64748b?text=."
-              alt="Illustrasi Halaman Login"
-              fill
-              style={{ objectFit: 'cover' }}
-              className="dark:brightness-[0.2] dark:grayscale"
-              priority
-            />
+          {/* Diperbarui: Mengganti gambar dengan ilustrasi SVG */}
+          <div className="bg-muted relative hidden h-full w-full items-center justify-center md:flex">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-50 via-slate-50 to-stone-100 dark:from-green-950/20 dark:via-slate-950/50 dark:to-stone-950/50" />
+            <svg
+                className="absolute inset-0 h-full w-full text-slate-200/50 dark:text-slate-800/50"
+                xmlns="http://www.w3.org/2000/svg"
+                width="100%"
+                height="100%"
+            >
+                <defs>
+                <pattern
+                    id="pattern"
+                    width="80"
+                    height="80"
+                    patternUnits="userSpaceOnUse"
+                    patternTransform="rotate(45)"
+                >
+                    <rect width="2" height="80" fill="currentColor" />
+                </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#pattern)" />
+            </svg>
+            <div className="relative z-10 text-center text-slate-600 dark:text-slate-400">
+                <BookCheck className="mx-auto h-24 w-24 text-primary/50" />
+                <h2 className="mt-4 text-2xl font-semibold">
+                    Sistem Informasi Laporan Penelitian
+                </h2>
+                <p className="mt-2 text-sm">
+                    Institut Agama Islam Persis Garut
+                </p>
+            </div>
           </div>
         </CardContent>
       </Card>
