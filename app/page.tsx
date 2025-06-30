@@ -32,10 +32,10 @@ const HeroSection = () => (
         <div className="flex flex-col justify-center space-y-4">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-              Digitalisasi Laporan Penelitian Mahasiswa
+              Digitalisasi Laporan Pengabdian Mahasiswa
             </h1>
             <p className="max-w-[600px] text-muted-foreground md:text-xl">
-              Platform terpusat untuk memudahkan mahasiswa dalam melaporkan, DPL dalam memverifikasi, dan LPPM dalam mengelola seluruh data penelitian.
+              Platform terpusat untuk memudahkan mahasiswa dalam melaporkan, DPL dalam memverifikasi, dan LPPM dalam mengelola seluruh data pengabdian.
             </p>
           </div>
           <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -46,7 +46,6 @@ const HeroSection = () => (
             </Link>
           </div>
         </div>
-        {/* Diperbarui: Mengganti gambar dengan ilustrasi SVG */}
         <div className="flex items-center justify-center">
             <div className="relative w-full max-w-md">
                 <div className="absolute -top-4 -left-4 w-72 h-72 bg-green-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob dark:bg-green-800"></div>
@@ -95,7 +94,7 @@ const FeatureSection = () => (
           <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm">Fitur Utama</div>
           <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Sistem yang Terintegrasi & Efisien</h2>
           <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-            Dirancang untuk menyederhanakan setiap langkah dalam siklus pelaporan penelitian.
+            Dirancang untuk menyederhanakan setiap langkah dalam siklus pelaporan pengabdian.
           </p>
         </div>
       </div>
@@ -113,7 +112,7 @@ const FeatureSection = () => (
         <div className="grid gap-1 text-center">
             <ShieldCheck className="h-10 w-10 mx-auto text-primary" />
             <h3 className="text-lg font-bold">Manajemen oleh LPPM</h3>
-            <p className="text-sm text-muted-foreground">LPPM memiliki kontrol penuh untuk mengelola pengguna, bidang penelitian, dan melihat rekapitulasi data.</p>
+            <p className="text-sm text-muted-foreground">LPPM memiliki kontrol penuh untuk mengelola pengguna, bidang pengabdian, dan melihat rekapitulasi data.</p>
         </div>
       </div>
     </div>

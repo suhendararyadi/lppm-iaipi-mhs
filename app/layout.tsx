@@ -7,9 +7,9 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  // Diperbarui: Menyesuaikan judul dan deskripsi aplikasi
-  title: "LPPM IAI Persis - Laporan Penelitian Mahasiswa",
-  description: "Aplikasi untuk manajemen dan pelaporan kegiatan penelitian mahasiswa di LPPM IAI Persis Garut.",
+  // Diperbarui: Mengganti "Penelitian" menjadi "Pengabdian"
+  title: "LPPM IAI Persis - Laporan Pengabdian Mahasiswa",
+  description: "Aplikasi untuk manajemen dan pelaporan kegiatan pengabdian mahasiswa di LPPM IAI Persis Garut.",
 };
 
 export default function RootLayout({
