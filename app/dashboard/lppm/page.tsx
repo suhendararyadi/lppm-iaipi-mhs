@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
-import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { IconArrowRight, IconUsers, IconUsersGroup, IconBooks, IconPrinter, IconChartBar } from '@tabler/icons-react';
 
