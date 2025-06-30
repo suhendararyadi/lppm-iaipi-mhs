@@ -32,65 +32,45 @@ const StatCard = ({ title, value, icon: Icon, isLoading }: { title: string, valu
 export default function LppmStatistikPage() {
   const [stats, setStats] = useState<Stats>({ totalUsers: 0, totalMahasiswa: 0, totalDpl: 0, totalLaporan: 0, totalBidang: 0 });
   const [laporanData, setLaporanData] = useState<RecordModel[]>([]);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
-  const [isLoadingChart, setIsLoadingChart] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Fungsi untuk mengambil data statistik (cepat)
-  const fetchStatCounts = useCallback(async (signal?: AbortSignal) => {
-    setIsLoadingStats(true);
+  const fetchStats = useCallback(async (signal?: AbortSignal) => {
+    setIsLoading(true);
     try {
-      const results = await Promise.allSettled([
-        pb.collection('users').getList(1, 1, { filter: 'role != "lppm"', signal }),
-        pb.collection('users').getList(1, 1, { filter: 'role = "mahasiswa"', signal }),
-        pb.collection('users').getList(1, 1, { filter: 'role = "dpl"', signal }),
-        pb.collection('laporans').getList(1, 1, { signal }),
-        pb.collection('bidang_penelitian').getList(1, 1, { signal }),
+      // Menggunakan getFullList untuk akurasi data pengguna
+      const [allUsers, laporans, bidangData] = await Promise.all([
+        pb.collection('users').getFullList<RecordModel>({ filter: 'role != "lppm"', signal }),
+        pb.collection('laporans').getFullList({ sort: '-created', signal }),
+        pb.collection('bidang_penelitian').getFullList({ signal }),
       ]);
 
-      const newStats: Stats = {
-        totalUsers: results[0].status === 'fulfilled' ? results[0].value.totalItems : 0,
-        totalMahasiswa: results[1].status === 'fulfilled' ? results[1].value.totalItems : 0,
-        totalDpl: results[2].status === 'fulfilled' ? results[2].value.totalItems : 0,
-        totalLaporan: results[3].status === 'fulfilled' ? results[3].value.totalItems : 0,
-        totalBidang: results[4].status === 'fulfilled' ? results[4].value.totalItems : 0,
-      };
-      setStats(newStats);
-    } catch (error) {
-      if (!(error instanceof ClientResponseError && error.isAbort)) {
-        toast.error("Gagal memuat data statistik.");
-      }
-    } finally {
-      if (!signal?.aborted) setIsLoadingStats(false);
-    }
-  }, []);
+      const totalMahasiswa = allUsers.filter(user => user.role === 'mahasiswa').length;
+      const totalDpl = allUsers.filter(user => user.role === 'dpl').length;
 
-  // Fungsi terpisah untuk mengambil data chart (lebih lambat)
-  const fetchChartData = useCallback(async (signal?: AbortSignal) => {
-    setIsLoadingChart(true);
-    try {
-        const laporans = await pb.collection('laporans').getFullList({ sort: '-created', signal });
-        setLaporanData(laporans);
+      setStats({
+        totalUsers: allUsers.length,
+        totalMahasiswa: totalMahasiswa,
+        totalDpl: totalDpl,
+        totalLaporan: laporans.length,
+        totalBidang: bidangData.length,
+      });
+      setLaporanData(laporans);
+      
     } catch (error) {
         if (!(error instanceof ClientResponseError && error.isAbort)) {
-            toast.error("Gagal memuat data untuk grafik.");
+            console.error("Gagal memuat data statistik:", error);
+            toast.error("Gagal memuat data statistik. Pastikan ada data di database.");
         }
     } finally {
-        if (!signal?.aborted) setIsLoadingChart(false);
+      if (!signal?.aborted) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    const statController = new AbortController();
-    const chartController = new AbortController();
-    
-    fetchStatCounts(statController.signal);
-    fetchChartData(chartController.signal);
-
-    return () => {
-      statController.abort();
-      chartController.abort();
-    };
-  }, [fetchStatCounts, fetchChartData]);
+    const controller = new AbortController();
+    fetchStats(controller.signal);
+    return () => controller.abort();
+  }, [fetchStats]);
 
   const chartData = useMemo(() => {
     const dailyCounts: { [key: string]: number } = {};
@@ -123,15 +103,15 @@ export default function LppmStatistikPage() {
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <StatCard title="Total Pengguna" value={stats.totalUsers} icon={IconUsers} isLoading={isLoadingStats} />
-        <StatCard title="Mahasiswa" value={stats.totalMahasiswa} icon={IconUsers} isLoading={isLoadingStats} />
-        <StatCard title="DPL" value={stats.totalDpl} icon={IconUserCheck} isLoading={isLoadingStats} />
-        <StatCard title="Total Laporan" value={stats.totalLaporan} icon={IconFileText} isLoading={isLoadingStats} />
-        <StatCard title="Bidang Penelitian" value={stats.totalBidang} icon={IconBooks} isLoading={isLoadingStats} />
+        <StatCard title="Total Pengguna" value={stats.totalUsers} icon={IconUsers} isLoading={isLoading} />
+        <StatCard title="Mahasiswa" value={stats.totalMahasiswa} icon={IconUsers} isLoading={isLoading} />
+        <StatCard title="DPL" value={stats.totalDpl} icon={IconUserCheck} isLoading={isLoading} />
+        <StatCard title="Total Laporan" value={stats.totalLaporan} icon={IconFileText} isLoading={isLoading} />
+        <StatCard title="Bidang Penelitian" value={stats.totalBidang} icon={IconBooks} isLoading={isLoading} />
       </div>
 
       <div className="mt-4">
-        {isLoadingChart ? (
+        {isLoading ? (
             <Card>
                 <CardHeader>
                     <Skeleton className="h-6 w-1/2" />

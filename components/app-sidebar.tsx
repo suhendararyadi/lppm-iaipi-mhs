@@ -4,7 +4,7 @@ import * as React from "react"
 import { pb } from "@/lib/pocketbase";
 import {
   IconLayoutDashboard, IconFileText, IconUsers, IconSettings, IconHelp,
-  IconBuildingCommunity, IconFileCheck, IconHistory, IconBooks, IconUsersGroup, IconPrinter, IconSchool,
+  IconBuildingCommunity, IconFileCheck, IconHistory, IconBooks, IconUsersGroup, IconPrinter, IconSchool, IconChartBar,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -45,10 +45,11 @@ const dataDpl = {
 const dataLppm = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/lppm", icon: IconLayoutDashboard },
+    { title: "Statistik", url: "/dashboard/lppm/statistik", icon: IconChartBar },
     { title: "Manajemen Pengguna", url: "/dashboard/lppm/users", icon: IconUsers },
     { title: "Manajemen Kelompok", url: "/dashboard/lppm/kelompok", icon: IconUsersGroup },
-    { title: "Bidang Penelitian", url: "/dashboard/lppm/bidang", icon: IconBooks },
     { title: "Manajemen Prodi", url: "/dashboard/lppm/prodi", icon: IconSchool },
+    { title: "Bidang Penelitian", url: "/dashboard/lppm/bidang", icon: IconBooks },
     { title: "Cetak Laporan", url: "/dashboard/lppm/cetak", icon: IconPrinter },
   ],
   navSecondary: [
@@ -58,17 +59,9 @@ const dataLppm = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  // Inisialisasi state dengan fungsi untuk mendapatkan nilai awal
-  const [menuData, setMenuData] = React.useState(() => {
-    const user = pb.authStore.model;
-    if (user?.role === 'dpl') return dataDpl;
-    if (user?.role === 'lppm') return dataLppm;
-    return dataMahasiswa;
-  });
+  const [menuData, setMenuData] = React.useState(dataMahasiswa); // Default
 
-  // Diperbaiki: Menggunakan listener untuk bereaksi terhadap perubahan login/logout
   React.useEffect(() => {
-    // Fungsi ini akan dipanggil setiap kali ada perubahan pada authStore
     const updateMenu = () => {
       const user = pb.authStore.model;
       if (user?.role === 'dpl') {
@@ -79,16 +72,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         setMenuData(dataMahasiswa);
       }
     };
-
-    // Berlangganan pada perubahan authStore.
-    // Argumen kedua (true) membuatnya langsung berjalan saat pertama kali dipanggil.
     const unsubscribe = pb.authStore.onChange(updateMenu, true);
-
-    // Fungsi cleanup untuk berhenti berlangganan saat komponen di-unmount
-    return () => {
-      unsubscribe();
-    };
-  }, []); // Dependency array kosong sudah benar karena kita hanya ingin mengatur listener sekali.
+    return () => unsubscribe();
+  }, []);
 
   return (
     <Sidebar collapsible="offcanvas" {...props}>
