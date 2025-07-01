@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
-import { Document, Packer, Paragraph, TextRun, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, PageOrientation, HeadingLevel } from 'docx';
+import { Document, Packer, Paragraph, TextRun, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, PageOrientation, HeadingLevel, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,7 +24,15 @@ interface Anggota {
 interface Kelompok extends RecordModel {
     anggota: Anggota[];
     expand?: {
-        ketua: { nama_lengkap: string; nim: string; prodi: string; };
+        ketua: {
+            id: string;
+            nama_lengkap: string;
+            nim: string;
+            prodi: string;
+            expand?: {
+                prodi: Prodi;
+            }
+        };
         dpl?: { nama_lengkap: string; };
     }
 }
@@ -38,7 +46,7 @@ interface Laporan extends RecordModel {
     rencana_tindak_lanjut: string;
     mahasiswa_terlibat: string[];
     expand?: { 
-        bidang_penelitian: { nama_bidang: string; },
+        bidang_penelitian: { nama_bidang: string; };
         kelompok: Kelompok;
     }
 }
@@ -47,14 +55,11 @@ export default function CetakLaporanPage() {
   const [allKelompok, setAllKelompok] = useState<Kelompok[]>([]);
   const [allLaporan, setAllLaporan] = useState<Laporan[]>([]);
   const [prodiList, setProdiList] = useState<Prodi[]>([]);
-
-  // State untuk Cetak per Kelompok (Fitur 1)
+  const [selectedProdiForRekap, setSelectedProdiForRekap] = useState<string>('');
+  
+  // State untuk fitur cetak per kelompok
   const [selectedKelompok, setSelectedKelompok] = useState<Kelompok | null>(null);
   const [laporanList, setLaporanList] = useState<Laporan[]>([]);
-
-  // State untuk Cetak per Prodi (Fitur 2)
-  const [selectedProdiForRekap, setSelectedProdiForRekap] = useState<string>('');
-
 
   useEffect(() => {
     const controller = new AbortController();
@@ -62,7 +67,7 @@ export default function CetakLaporanPage() {
       try {
         const [kelompokData, laporanData, prodiData] = await Promise.all([
             pb.collection('kelompok_mahasiswa').getFullList<Kelompok>({ sort: 'created', expand: 'ketua,dpl,ketua.prodi', signal: controller.signal }),
-            pb.collection('laporans').getFullList<Laporan>({ sort: '-created', expand: 'kelompok,kelompok.ketua,bidang_penelitian', signal: controller.signal }),
+            pb.collection('laporans').getFullList<Laporan>({ sort: '-created', expand: 'kelompok,kelompok.ketua,kelompok.dpl,kelompok.ketua.prodi,bidang_penelitian', signal: controller.signal }),
             pb.collection('program_studi').getFullList<Prodi>({ sort: 'nama_prodi', signal: controller.signal })
         ]);
         setAllKelompok(kelompokData);
@@ -88,12 +93,73 @@ export default function CetakLaporanPage() {
         setLaporanList(laporanData);
     }
   }, [allKelompok, allLaporan]);
-  
+
+  // REVISI: Mengimplementasikan fungsi download per kelompok
   const handleDownloadKelompokDocx = async () => {
-    // ... (Fungsi ini tidak berubah dan sudah benar)
+    if (!selectedKelompok || laporanList.length === 0) {
+        toast.error("Pilih kelompok dan pastikan kelompok memiliki laporan untuk diunduh.");
+        return;
+    }
+
+    const kelompok = selectedKelompok;
+    const laporans = laporanList;
+    const ketua = kelompok.expand?.ketua;
+    const dpl = kelompok.expand?.dpl;
+    const anggota = kelompok.anggota || [];
+    const prodiKetua = kelompok.expand?.ketua?.expand?.prodi?.nama_prodi || 'N/A';
+    const stripHtml = (html: string) => html ? html.replace(/<[^>]*>?/gm, '') : '';
+
+    const tableHeader = new DocxTableRow({
+        children: [
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "No", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Bidang", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Judul Kegiatan", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Tempat", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Narasumber", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Deskripsi", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Mahasiswa Terlibat", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "RTL", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Tanggal", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Status", bold: true })] })] }),
+        ],
+    });
+
+    const dataRows = laporans.map((laporan, index) => new DocxTableRow({
+        children: [
+            new DocxTableCell({ children: [new Paragraph(`${index + 1}`)] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.expand?.bidang_penelitian?.nama_bidang || '-')] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.judul_kegiatan)] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.tempat_pelaksanaan || '-')] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.narasumber || '-')] }),
+            new DocxTableCell({ children: [new Paragraph(stripHtml(laporan.deskripsi_kegiatan))] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.mahasiswa_terlibat.join(', '))] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.rencana_tindak_lanjut || '-')] }),
+            new DocxTableCell({ children: [new Paragraph(new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID'))] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.status)] }),
+        ],
+    }));
+
+    const doc = new Document({
+        sections: [{
+            properties: { page: { size: { orientation: PageOrientation.LANDSCAPE } } },
+            children: [
+                new Paragraph({ text: "Rekapitulasi Laporan Pengabdian Mahasiswa", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                new Paragraph({ text: "" }),
+                new Paragraph({ children: [new TextRun({ text: "Ketua Kelompok: ", bold: true }), new TextRun({ text: `${ketua?.nama_lengkap || 'N/A'} (${ketua?.nim || 'NIM tidak ada'}) - ${prodiKetua}` })] }),
+                new Paragraph({ children: [new TextRun({ text: "DPL: ", bold: true }), new TextRun({ text: dpl?.nama_lengkap || 'Belum Ditugaskan' })] }),
+                new Paragraph({ children: [new TextRun({ text: "Anggota:", bold: true })] }),
+                ...anggota.map(a => new Paragraph({ text: `- ${a.nama} (${a.nim}) - ${a.prodiNama}`, bullet: { level: 0 }})),
+                new Paragraph({ text: "" }),
+                new DocxTable({ rows: [tableHeader, ...dataRows], width: { size: 100, type: WidthType.PERCENTAGE } }),
+            ],
+        }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `rekap-laporan-kelompok-${ketua?.nama_lengkap?.replace(/ /g, "_") || 'kelompok'}.docx`);
+    toast.success("Dokumen berhasil diunduh!");
   };
 
-  // Diperbarui: Fungsi baru untuk download rekap per prodi
   const handleDownloadProdiDocx = async () => {
     if (!selectedProdiForRekap) {
         toast.error("Silakan pilih program studi terlebih dahulu.");
@@ -103,17 +169,13 @@ export default function CetakLaporanPage() {
     const prodiTerpilih = prodiList.find(p => p.id === selectedProdiForRekap);
     if (!prodiTerpilih) return;
 
-    // Diperbarui: Logika filter yang lebih cerdas
-    // 1. Cari ID semua kelompok yang relevan
     const relevantKelompokIds = allKelompok
-      .filter(kelompok => {
-        const isKetuaProdi = kelompok.expand?.ketua?.prodi === selectedProdiForRekap;
-        const hasAnggotaProdi = (kelompok.anggota || []).some(anggota => anggota.prodiId === selectedProdiForRekap);
-        return isKetuaProdi || hasAnggotaProdi;
-      })
+      .filter(kelompok =>
+        (kelompok.expand?.ketua?.prodi === selectedProdiForRekap) ||
+        (kelompok.anggota || []).some(anggota => anggota.prodiId === selectedProdiForRekap)
+      )
       .map(kelompok => kelompok.id);
 
-    // 2. Filter semua laporan berdasarkan ID kelompok yang relevan
     const laporanFiltered = allLaporan.filter(laporan => {
       const kelompokId = laporan.expand?.kelompok?.id;
       return kelompokId && relevantKelompokIds.includes(kelompokId);
@@ -124,7 +186,6 @@ export default function CetakLaporanPage() {
         return;
     }
 
-    // 3. Kelompokkan laporan berdasarkan ID kelompoknya
     const groupedByKelompok = laporanFiltered.reduce((acc, laporan) => {
         const kelompokId = laporan.expand?.kelompok?.id;
         if (!kelompokId) return acc;
@@ -136,40 +197,64 @@ export default function CetakLaporanPage() {
     const stripHtml = (html: string) => html ? html.replace(/<[^>]*>?/gm, '') : '';
     const docChildren: (Paragraph | DocxTable)[] = [];
 
-    docChildren.push(new Paragraph({ text: "Rekapitulasi Laporan per Program Studi", heading: HeadingLevel.HEADING_1, alignment: "center" }));
-    docChildren.push(new Paragraph({ text: `Program Studi: ${prodiTerpilih.nama_prodi}`, heading: HeadingLevel.HEADING_2, alignment: "center" }));
-    
-    // 4. Loop melalui setiap kelompok dan buat bagian dokumennya
+    docChildren.push(new Paragraph({ text: "REKAPITULASI LAPORAN PENGABDIAN MAHASISWA", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }));
+    docChildren.push(new Paragraph({ text: `PROGRAM STUDI: ${prodiTerpilih.nama_prodi.toUpperCase()}`, heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }));
+    docChildren.push(new Paragraph({ text: "" }));
+
     for (const kelompokId in groupedByKelompok) {
         const kelompok = allKelompok.find(k => k.id === kelompokId);
         const laporansInGroup = groupedByKelompok[kelompokId];
         if (!kelompok) continue;
 
-        docChildren.push(new Paragraph({ text: "" }));
-        docChildren.push(new Paragraph({ text: `Kelompok: ${kelompok.expand?.ketua?.nama_lengkap || 'N/A'}`, heading: HeadingLevel.HEADING_3 }));
-        docChildren.push(new Paragraph({ children: [new TextRun({ text: "DPL: ", bold: true }), new TextRun({ text: kelompok.expand?.dpl?.nama_lengkap || 'Belum Ditugaskan' })] }));
+        docChildren.push(new Paragraph({ text: `Laporan Kelompok: ${kelompok.expand?.ketua?.nama_lengkap || 'N/A'}`, heading: HeadingLevel.HEADING_3 }));
+        docChildren.push(new Paragraph({ children: [new TextRun({ text: "Nama DPL: ", bold: true }), new TextRun({ text: kelompok.expand?.dpl?.nama_lengkap || 'Belum Ditugaskan' })] }));
+        docChildren.push(new Paragraph({ children: [new TextRun({ text: "Mahasiswa:", bold: true })] }));
         
+        (kelompok.anggota || []).forEach(mahasiswa => {
+            docChildren.push(new Paragraph({ text: `- ${mahasiswa.nama} (${mahasiswa.nim})`, bullet: { level: 0 } }));
+        });
+        docChildren.push(new Paragraph({ text: "" }));
+
         const tableHeader = new DocxTableRow({
             children: [
                 new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "No", bold: true })] })] }),
+                new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Bidang", bold: true })] })] }),
                 new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Judul Kegiatan", bold: true })] })] }),
+                new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Tempat", bold: true })] })] }),
+                new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Narasumber", bold: true })] })] }),
                 new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Deskripsi", bold: true })] })] }),
+                new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Mahasiswa Terlibat", bold: true })] })] }),
+                new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "RTL", bold: true })] })] }),
                 new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Tanggal", bold: true })] })] }),
+                new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Status", bold: true })] })] }),
             ],
         });
+
         const dataRows = laporansInGroup.map((laporan, index) => new DocxTableRow({
             children: [
                 new DocxTableCell({ children: [new Paragraph(`${index + 1}`)] }),
+                new DocxTableCell({ children: [new Paragraph(laporan.expand?.bidang_penelitian?.nama_bidang || '-')] }),
                 new DocxTableCell({ children: [new Paragraph(laporan.judul_kegiatan)] }),
+                new DocxTableCell({ children: [new Paragraph(laporan.tempat_pelaksanaan || '-')] }),
+                new DocxTableCell({ children: [new Paragraph(laporan.narasumber || '-')] }),
                 new DocxTableCell({ children: [new Paragraph(stripHtml(laporan.deskripsi_kegiatan))] }),
+                new DocxTableCell({ children: [new Paragraph(laporan.mahasiswa_terlibat.join(', '))] }),
+                new DocxTableCell({ children: [new Paragraph(laporan.rencana_tindak_lanjut || '-')] }),
                 new DocxTableCell({ children: [new Paragraph(new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID'))] }),
+                new DocxTableCell({ children: [new Paragraph(laporan.status)] }),
             ],
         }));
-
+        
         docChildren.push(new DocxTable({ rows: [tableHeader, ...dataRows], width: { size: 100, type: WidthType.PERCENTAGE } }));
+        docChildren.push(new Paragraph({ text: "" }));
     }
 
-    const doc = new Document({ sections: [{ children: docChildren }] });
+    const doc = new Document({
+        sections: [{
+            properties: { page: { size: { orientation: PageOrientation.LANDSCAPE } } },
+            children: docChildren,
+        }],
+    });
 
     const blob = await Packer.toBlob(doc);
     saveAs(blob, `rekap-laporan-prodi-${prodiTerpilih.nama_prodi.replace(/ /g, "_")}.docx`);
