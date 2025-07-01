@@ -4,7 +4,7 @@ import * as React from "react"
 import { pb } from "@/lib/pocketbase";
 import {
   IconLayoutDashboard, IconFileText, IconUsers, IconSettings, IconHelp,
-  IconBuildingCommunity, IconFileCheck, IconHistory, IconBooks, IconUsersGroup, IconPrinter, IconSchool, IconChartBar,
+  IconBuildingCommunity, IconFileCheck, IconBooks, IconUsersGroup, IconPrinter, IconSchool, IconChartBar,
   IconAward,
 } from "@tabler/icons-react"
 
