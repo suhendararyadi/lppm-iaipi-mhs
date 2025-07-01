@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button"
+//import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { IconBook } from "@tabler/icons-react"
@@ -17,16 +17,16 @@ export function SiteHeader() {
             <h1 className="text-base font-semibold">Laporan Pengabdian Mahasiswa</h1>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
+          {/* <Button variant="ghost" asChild size="sm" className="hidden sm:flex">
             <a
-              href="https://github.com/suhendararyadi/lppm-iaipi-mhs"
+              href="#"
               rel="noopener noreferrer"
               target="_blank"
               className="dark:text-foreground"
             >
-              GitHub
+              V.1.0
             </a>
-          </Button>
+          </Button> */}
         </div>
       </div>
     </header>
