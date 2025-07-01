@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { Document, Packer, Paragraph, TextRun, Table as DocxTable, TableRow as DocxTableRow, TableCell as DocxTableCell, WidthType, PageOrientation } from 'docx';
+import { saveAs } from 'file-saver';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,16 +14,25 @@ import { Badge } from '@/components/ui/badge';
 import { IconFileText, IconEye, IconPencil, IconTrash, IconDownload } from '@tabler/icons-react';
 import { toast } from "sonner";
 
-// Tipe data yang diperluas untuk mencakup relasi
 interface Anggota {
   nama: string;
   nim: string;
-  prodi: string;
+  prodiNama: string;
 }
+// Diperbarui: Menambahkan nim dan expand prodi untuk ketua
 interface Kelompok extends RecordModel {
     anggota: Anggota[];
     expand?: {
         ketua: {
+            nama_lengkap: string;
+            nim: string;
+            expand?: {
+                prodi: {
+                    nama_prodi: string;
+                }
+            }
+        },
+        dpl?: {
             nama_lengkap: string;
         }
     }
@@ -32,6 +41,11 @@ interface Laporan extends RecordModel {
     judul_kegiatan: string;
     tanggal_kegiatan: string;
     status: 'Draft' | 'Menunggu Persetujuan' | 'Disetujui' | 'Revisi';
+    tempat_pelaksanaan: string;
+    narasumber: string;
+    deskripsi_kegiatan: string;
+    rencana_tindak_lanjut: string;
+    mahasiswa_terlibat: string[];
     expand?: {
         bidang_penelitian: {
             nama_bidang: string;
@@ -53,7 +67,8 @@ export default function LaporanListPage() {
     }
     setIsLoading(true);
     try {
-      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'ketua' });
+      // Diperbarui: Menambahkan expand untuk prodi ketua
+      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'ketua,dpl,ketua.prodi' });
       setKelompok(kelompokRecord);
       
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
@@ -98,40 +113,67 @@ export default function LaporanListPage() {
     });
   };
 
-  const handleDownloadPDF = () => {
-    if (!kelompok) return;
-    const doc = new jsPDF();
+  const handleDownloadDocx = async () => {
+    if (!kelompok || laporans.length === 0) {
+        toast.error("Data laporan belum lengkap untuk diunduh.");
+        return;
+    }
+    const ketua = kelompok.expand?.ketua;
+    const dpl = kelompok.expand?.dpl;
+    const anggota = kelompok.anggota || [];
+    const prodiKetua = ketua?.expand?.prodi?.nama_prodi || 'N/A';
+    const stripHtml = (html: string) => html ? html.replace(/<[^>]*>?/gm, '') : '';
 
-    // Judul Dokumen
-    doc.setFontSize(18);
-    doc.text("Rekapitulasi Laporan Penelitian Mahasiswa", 14, 22);
-    doc.setFontSize(12);
-    doc.text("LPPM IAI Persis Garut", 14, 30);
-
-    // Informasi Kelompok
-    doc.setFontSize(11);
-    doc.text(`Ketua Kelompok: ${kelompok.expand?.ketua.nama_lengkap || 'Tidak ada data'}`, 14, 45);
-    doc.text("Anggota Kelompok:", 14, 52);
-    
-    const anggotaText = kelompok.anggota.map((anggota, index) => `${index + 1}. ${anggota.nama} (${anggota.nim})`);
-    doc.text(anggotaText, 18, 59);
-
-    // Tabel Laporan
-    autoTable(doc, {
-        startY: 60 + (anggotaText.length * 7),
-        head: [['No', 'Judul Kegiatan', 'Bidang', 'Tanggal', 'Status']],
-        body: laporans.map((laporan, index) => [
-            index + 1,
-            laporan.judul_kegiatan,
-            laporan.expand?.bidang_penelitian?.nama_bidang || '-',
-            new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID'),
-            laporan.status,
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: [22, 163, 74] },
+    const tableHeader = new DocxTableRow({
+        children: [
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "No", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Bidang", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Judul Kegiatan", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Tempat", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Narasumber", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Deskripsi", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Mahasiswa Terlibat", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "RTL", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Tanggal", bold: true })] })] }),
+            new DocxTableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Status", bold: true })] })] }),
+        ],
     });
 
-    doc.save(`rekap-laporan-${kelompok.expand?.ketua.nama_lengkap || 'kelompok'}.pdf`);
+    const dataRows = laporans.map((laporan, index) => new DocxTableRow({
+        children: [
+            new DocxTableCell({ children: [new Paragraph(`${index + 1}`)] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.expand?.bidang_penelitian?.nama_bidang || '-')] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.judul_kegiatan)] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.tempat_pelaksanaan || '-')] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.narasumber || '-')] }),
+            new DocxTableCell({ children: [new Paragraph(stripHtml(laporan.deskripsi_kegiatan))] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.mahasiswa_terlibat.join(', '))] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.rencana_tindak_lanjut || '-')] }),
+            new DocxTableCell({ children: [new Paragraph(new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID'))] }),
+            new DocxTableCell({ children: [new Paragraph(laporan.status)] }),
+        ],
+    }));
+
+    const doc = new Document({
+        sections: [{
+            properties: { page: { size: { orientation: PageOrientation.LANDSCAPE } } },
+            children: [
+                new Paragraph({ text: "Rekapitulasi Laporan Pengabdian Mahasiswa", heading: "Heading1", alignment: "center" }),
+                new Paragraph({ text: "" }),
+                // Diperbarui: Menambahkan NIM dan Prodi untuk Ketua
+                new Paragraph({ children: [new TextRun({ text: "Ketua Kelompok: ", bold: true }), new TextRun({ text: `${ketua?.nama_lengkap || 'N/A'} (${ketua?.nim || 'NIM tidak ada'}) - ${prodiKetua}` })] }),
+                new Paragraph({ children: [new TextRun({ text: "DPL: ", bold: true }), new TextRun({ text: dpl?.nama_lengkap || 'Belum Ditugaskan' })] }),
+                new Paragraph({ children: [new TextRun({ text: "Anggota:", bold: true })] }),
+                ...anggota.map(a => new Paragraph({ text: `- ${a.nama} (${a.nim}) - ${a.prodiNama}`, bullet: { level: 0 }})),
+                new Paragraph({ text: "" }),
+                new DocxTable({ rows: [tableHeader, ...dataRows], width: { size: 100, type: WidthType.PERCENTAGE } }),
+            ],
+        }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `rekap-laporan-${ketua?.nama_lengkap || 'kelompok'}.docx`);
+    toast.success("Dokumen berhasil diunduh!");
   };
 
   const getStatusBadgeVariant = (status: Laporan['status']): "default" | "secondary" | "destructive" | "outline" => {
@@ -148,12 +190,11 @@ export default function LaporanListPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="flex items-center gap-2"><IconFileText />Daftar Laporan Penelitian</CardTitle>
+            <CardTitle className="flex items-center gap-2"><IconFileText />Daftar Laporan Pengabdian</CardTitle>
             <CardDescription>Lihat, edit, atau hapus laporan yang telah Anda buat.</CardDescription>
           </div>
           <div className="flex gap-2">
-            {/* Diperbarui: Tombol untuk download PDF */}
-            <Button variant="outline" onClick={handleDownloadPDF} disabled={isLoading || laporans.length === 0}>
+            <Button variant="outline" onClick={handleDownloadDocx} disabled={isLoading || laporans.length === 0}>
               <IconDownload className="mr-2 h-4 w-4" />
               Download Rekap
             </Button>
