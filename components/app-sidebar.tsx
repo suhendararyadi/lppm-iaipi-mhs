@@ -30,13 +30,13 @@ const dataMahasiswa = {
   ],
 };
 
-// Data menu untuk DPL
+// REVISI: Memperbarui URL untuk Riwayat Verifikasi
 const dataDpl = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/dpl", icon: IconLayoutDashboard },
     { title: "Verifikasi Laporan", url: "/dashboard/dpl/laporan", icon: IconFileCheck },
     { title: "Penilaian Mahasiswa", url: "/dashboard/dpl/penilaian", icon: IconAward },
-    { title: "Riwayat Verifikasi", url: "#", icon: IconHistory },
+    //{ title: "Riwayat Verifikasi", url: "/dashboard/dpl/riwayat", icon: IconHistory }, 
   ],
   navSecondary: [
     { title: "Pengaturan", url: "#", icon: IconSettings },
@@ -44,7 +44,7 @@ const dataDpl = {
   ],
 };
 
-// REVISI: Tambahkan menu Cetak Nilai untuk LPPM
+// Data menu untuk LPPM
 const dataLppm = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/lppm", icon: IconLayoutDashboard },
