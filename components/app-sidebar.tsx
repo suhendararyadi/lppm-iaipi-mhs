@@ -5,6 +5,7 @@ import { pb } from "@/lib/pocketbase";
 import {
   IconLayoutDashboard, IconFileText, IconUsers, IconSettings, IconHelp,
   IconBuildingCommunity, IconFileCheck, IconHistory, IconBooks, IconUsersGroup, IconPrinter, IconSchool, IconChartBar,
+  IconAward,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -21,6 +22,7 @@ const dataMahasiswa = {
     { title: "Dasbor", url: "/dashboard/mahasiswa", icon: IconLayoutDashboard },
     { title: "Laporan Saya", url: "/dashboard/mahasiswa/laporan", icon: IconFileText },
     { title: "Anggota Kelompok", url: "/dashboard/mahasiswa/anggota", icon: IconUsers },
+    { title: "Nilai Akhir", url: "/dashboard/mahasiswa/nilai", icon: IconAward },
   ],
   navSecondary: [
     { title: "Pengaturan", url: "#", icon: IconSettings },
@@ -33,6 +35,7 @@ const dataDpl = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/dpl", icon: IconLayoutDashboard },
     { title: "Verifikasi Laporan", url: "/dashboard/dpl/laporan", icon: IconFileCheck },
+    { title: "Penilaian Mahasiswa", url: "/dashboard/dpl/penilaian", icon: IconAward },
     { title: "Riwayat Verifikasi", url: "#", icon: IconHistory },
   ],
   navSecondary: [
@@ -41,7 +44,7 @@ const dataDpl = {
   ],
 };
 
-// Data menu untuk LPPM
+// REVISI: Tambahkan menu Cetak Nilai untuk LPPM
 const dataLppm = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/lppm", icon: IconLayoutDashboard },
@@ -51,6 +54,7 @@ const dataLppm = {
     { title: "Manajemen Prodi", url: "/dashboard/lppm/prodi", icon: IconSchool },
     { title: "Bidang Penelitian", url: "/dashboard/lppm/bidang", icon: IconBooks },
     { title: "Cetak Laporan", url: "/dashboard/lppm/cetak", icon: IconPrinter },
+    { title: "Cetak Nilai", url: "/dashboard/lppm/nilai", icon: IconAward },
   ],
   navSecondary: [
     { title: "Pengaturan", url: "#", icon: IconSettings },
