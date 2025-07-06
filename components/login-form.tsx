@@ -26,7 +26,7 @@ export function LoginForm({
     e.preventDefault();
     setIsLoading(true);
     setError("");
-    setNotification("Login berhasil! Sedang mengalihkan ke dasbor...");
+    setNotification("Login berhasil! Sedang memuat data...");
 
     try {
       const authData = await pb.collection('users').authWithPassword(email, password);
