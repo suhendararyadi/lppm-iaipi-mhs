@@ -23,7 +23,6 @@ interface UserPayload {
   nama_lengkap: string;
   email: string;
   role: string;
-  nim?: string; // REVISI: Tambahkan NIM (opsional)
   prodi?: string;
   password?: string;
   passwordConfirm?: string;
@@ -70,45 +69,52 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
     const email = (form.elements.namedItem('email') as HTMLInputElement).value;
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
     const passwordConfirm = (form.elements.namedItem('passwordConfirm') as HTMLInputElement).value;
-    const nim = (form.elements.namedItem('nim') as HTMLInputElement)?.value; // Ambil nilai NIM
 
-    const userData: UserPayload = {
-        nama_lengkap,
-        email,
-        role: selectedRole,
-    };
+    try {
+      if (isEditMode) {
+        // Diperbarui: Membuat objek data khusus untuk update
+        const updateData: Partial<UserPayload> = {
+            nama_lengkap,
+            // Email tidak diikutsertakan dalam update untuk menghindari error
+        };
 
-    if (selectedRole === 'mahasiswa') {
-        if (!selectedProdi) {
-            toast.error("Silakan pilih prodi untuk mahasiswa.");
-            setIsLoading(false);
-            return;
+        if (selectedRole === 'mahasiswa') {
+            updateData.prodi = selectedProdi;
         }
-        if (!nim && !isEditMode) {
-             toast.error("NIM wajib diisi untuk mahasiswa baru.");
-             setIsLoading(false);
-             return;
-        }
-        userData.prodi = selectedProdi;
-        userData.nim = nim; // REVISI: Tambahkan NIM ke payload
-    }
 
-    if (!isEditMode || password) {
+        if (password) {
+            if (password !== passwordConfirm) {
+                toast.error("Password dan konfirmasi password tidak cocok.");
+                setIsLoading(false);
+                return;
+            }
+            updateData.password = password;
+            updateData.passwordConfirm = passwordConfirm;
+        }
+
+        await pb.collection('users').update(user.id, updateData);
+        toast.success("Data pengguna berhasil diperbarui.");
+      } else {
+        // Logika untuk membuat pengguna baru (tetap sama)
+        const createData: Partial<UserPayload> = {
+            nama_lengkap,
+            email,
+            role: selectedRole,
+        };
+
+        if (selectedRole === 'mahasiswa') {
+            createData.prodi = selectedProdi;
+        }
+
         if (password !== passwordConfirm) {
             toast.error("Password dan konfirmasi password tidak cocok.");
             setIsLoading(false);
             return;
         }
-        userData.password = password;
-        userData.passwordConfirm = passwordConfirm;
-    }
-
-    try {
-      if (isEditMode) {
-        await pb.collection('users').update(user.id, userData);
-        toast.success("Data pengguna berhasil diperbarui.");
-      } else {
-        const newUserRecord = await pb.collection('users').create(userData);
+        createData.password = password;
+        createData.passwordConfirm = passwordConfirm;
+        
+        const newUserRecord = await pb.collection('users').create(createData);
         toast.success("Pengguna baru berhasil ditambahkan.");
 
         if (newUserRecord && newUserRecord.role === 'mahasiswa') {
@@ -157,11 +163,12 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="email" className="text-right">Email</Label>
-            <Input id="email" name="email" type="email" defaultValue={user?.email} className="col-span-3" required />
+            {/* Diperbarui: Email dibuat read-only saat mode edit */}
+            <Input id="email" name="email" type="email" defaultValue={user?.email} className="col-span-3" required readOnly={isEditMode} />
           </div>
            <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="role" className="text-right">Peran</Label>
-            <Select name="role" defaultValue={user?.role} onValueChange={setSelectedRole} required>
+            <Select name="role" defaultValue={user?.role} onValueChange={setSelectedRole} required disabled={isEditMode}>
                 <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Pilih peran..." />
                 </SelectTrigger>
@@ -171,45 +178,36 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
                 </SelectContent>
             </Select>
           </div>
-          
-          {/* REVISI: Tampilkan field NIM, Prodi, dan DPL jika peran mahasiswa dipilih */}
           {selectedRole === 'mahasiswa' && (
-            <>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="nim" className="text-right">NIM</Label>
-                <Input id="nim" name="nim" defaultValue={user?.nim} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="prodi" className="text-right">Prodi</Label>
-                  <Select name="prodi" defaultValue={user?.prodi} onValueChange={setSelectedProdi} required>
-                      <SelectTrigger className="col-span-3">
-                          <SelectValue placeholder="Pilih prodi..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                          {prodiList.map(prodi => (
-                              <SelectItem key={prodi.id} value={prodi.id}>{prodi.nama_prodi}</SelectItem>
-                          ))}
-                      </SelectContent>
-                  </Select>
-              </div>
-              {!isEditMode && (
-                <div className="grid grid-cols-4 items-center gap-4">
-                    <Label htmlFor="dpl" className="text-right">DPL</Label>
-                    <Select name="dpl" onValueChange={setSelectedDpl} required>
-                        <SelectTrigger className="col-span-3">
-                            <SelectValue placeholder="Pilih DPL Pembimbing..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {dplList.map(dpl => (
-                                <SelectItem key={dpl.id} value={dpl.id}>{dpl.nama_lengkap}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-              )}
-            </>
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="prodi" className="text-right">Prodi</Label>
+                <Select name="prodi" defaultValue={user?.prodi} onValueChange={setSelectedProdi} required>
+                    <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Pilih prodi..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {prodiList.map(prodi => (
+                            <SelectItem key={prodi.id} value={prodi.id}>{prodi.nama_prodi}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
           )}
-
+          {selectedRole === 'mahasiswa' && !isEditMode && (
+            <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="dpl" className="text-right">DPL</Label>
+                <Select name="dpl" onValueChange={setSelectedDpl} required>
+                    <SelectTrigger className="col-span-3">
+                        <SelectValue placeholder="Pilih DPL Pembimbing..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {dplList.map(dpl => (
+                            <SelectItem key={dpl.id} value={dpl.id}>{dpl.nama_lengkap}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+          )}
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="password" className="text-right">Password</Label>
             <Input id="password" name="password" type="password" className="col-span-3" placeholder={isEditMode ? 'Kosongkan jika tidak diubah' : ''} required={!isEditMode} />
