@@ -17,7 +17,7 @@ interface Laporan extends RecordModel {
     status: string;
     updated: string;
     expand?: {
-        kelompok: {
+        kelompok?: {
             expand?: {
                 ketua: {
                     nama_lengkap: string;
@@ -39,7 +39,7 @@ export default function LppmLaporanListPage() {
     try {
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
           sort: '-updated',
-          expand: 'kelompok.ketua,kelompok.dpl',
+          expand: 'kelompok,kelompok.ketua,kelompok.dpl',
           signal,
       });
       setLaporans(laporanList);
@@ -100,7 +100,6 @@ export default function LppmLaporanListPage() {
                       <TableCell>{new Date(laporan.updated).toLocaleDateString('id-ID', { day: 'numeric', month: 'long' })}</TableCell>
                       <TableCell><Badge variant={getStatusBadgeVariant(laporan.status)}>{laporan.status}</Badge></TableCell>
                       <TableCell className="text-right">
-                        {/* Mengarahkan ke halaman detail DPL karena memiliki tampilan terlengkap */}
                         <Link href={`/dashboard/dpl/laporan/${laporan.id}`}>
                             <Button variant="outline" size="icon"><IconEye className="h-4 w-4" /></Button>
                         </Link>

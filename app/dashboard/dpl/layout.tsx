@@ -14,10 +14,13 @@ export default function DplLayout({
 }) {
   const router = useRouter();
 
-  // Melindungi seluruh segmen layout ini untuk peran DPL
+  // Melindungi seluruh segmen layout ini
   useEffect(() => {
     const user = pb.authStore.model;
-    if (!pb.authStore.isValid || user?.role !== 'dpl') {
+    // Diperbarui: Sekarang mengizinkan peran 'dpl' ATAU 'lppm'
+    const isAuthorized = user?.role === 'dpl' || user?.role === 'lppm';
+    
+    if (!pb.authStore.isValid || !isAuthorized) {
       router.replace('/login');
     }
   }, [router]);
