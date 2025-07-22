@@ -4,8 +4,7 @@ import * as React from "react"
 import { pb } from "@/lib/pocketbase";
 import {
   IconLayoutDashboard, IconFileText, IconUsers, IconSettings, IconHelp,
-  IconBuildingCommunity, IconFileCheck, IconBooks, IconUsersGroup, IconPrinter, IconSchool, IconChartBar,
-  IconAward,
+  IconBuildingCommunity, IconFileCheck, IconHistory, IconBooks, IconUsersGroup, IconPrinter, IconSchool, IconChartBar,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -20,9 +19,9 @@ import {
 const dataMahasiswa = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/mahasiswa", icon: IconLayoutDashboard },
+    { title: "Statistik", url: "/dashboard/mahasiswa/statistik", icon: IconChartBar },
     { title: "Laporan Saya", url: "/dashboard/mahasiswa/laporan", icon: IconFileText },
     { title: "Anggota Kelompok", url: "/dashboard/mahasiswa/anggota", icon: IconUsers },
-    { title: "Nilai Akhir", url: "/dashboard/mahasiswa/nilai", icon: IconAward },
   ],
   navSecondary: [
     { title: "Pengaturan", url: "#", icon: IconSettings },
@@ -30,13 +29,12 @@ const dataMahasiswa = {
   ],
 };
 
-// REVISI: Memperbarui URL untuk Riwayat Verifikasi
+// Data menu untuk DPL
 const dataDpl = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/dpl", icon: IconLayoutDashboard },
     { title: "Verifikasi Laporan", url: "/dashboard/dpl/laporan", icon: IconFileCheck },
-    { title: "Penilaian Mahasiswa", url: "/dashboard/dpl/penilaian", icon: IconAward },
-    //{ title: "Riwayat Verifikasi", url: "/dashboard/dpl/riwayat", icon: IconHistory }, 
+    { title: "Riwayat Verifikasi", url: "#", icon: IconHistory },
   ],
   navSecondary: [
     { title: "Pengaturan", url: "#", icon: IconSettings },
@@ -49,12 +47,12 @@ const dataLppm = {
   navMain: [
     { title: "Dasbor", url: "/dashboard/lppm", icon: IconLayoutDashboard },
     { title: "Statistik", url: "/dashboard/lppm/statistik", icon: IconChartBar },
+    { title: "Manajemen Laporan", url: "/dashboard/lppm/laporan", icon: IconFileText },
     { title: "Manajemen Pengguna", url: "/dashboard/lppm/users", icon: IconUsers },
     { title: "Manajemen Kelompok", url: "/dashboard/lppm/kelompok", icon: IconUsersGroup },
     { title: "Manajemen Prodi", url: "/dashboard/lppm/prodi", icon: IconSchool },
-    { title: "Bidang Penelitian", url: "/dashboard/lppm/bidang", icon: IconBooks },
+    { title: "Bidang Pengabdian", url: "/dashboard/lppm/bidang", icon: IconBooks },
     { title: "Cetak Laporan", url: "/dashboard/lppm/cetak", icon: IconPrinter },
-    { title: "Cetak Nilai", url: "/dashboard/lppm/nilai", icon: IconAward },
   ],
   navSecondary: [
     { title: "Pengaturan", url: "#", icon: IconSettings },
