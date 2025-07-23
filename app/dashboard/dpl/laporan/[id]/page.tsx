@@ -5,6 +5,8 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { pb } from '@/lib/pocketbase';
 import { RecordModel, ClientResponseError } from 'pocketbase';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { saveAs } from 'file-saver';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -61,14 +63,14 @@ export default function DetailLaporanDplPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Diperbarui: Menentukan URL kembali berdasarkan peran pengguna
+  const currentUserRole = pb.authStore.model?.role;
+
   const backUrl = useMemo(() => {
-    const role = pb.authStore.model?.role;
-    if (role === 'lppm') {
+    if (currentUserRole === 'lppm') {
       return '/dashboard/lppm/laporan';
     }
     return '/dashboard/dpl';
-  }, []);
+  }, [currentUserRole]);
 
   const fetchLaporan = useCallback(async (signal?: AbortSignal) => {
     if (!id || typeof id !== 'string') return;
@@ -83,7 +85,7 @@ export default function DetailLaporanDplPage() {
     } catch (error) {
       if (!(error instanceof ClientResponseError && error.isAbort)) {
         toast.error("Gagal memuat detail laporan.");
-        router.push(backUrl); // Gunakan URL dinamis
+        router.push(backUrl);
       }
     } finally {
       if (!signal?.aborted) setIsLoading(false);
@@ -106,7 +108,7 @@ export default function DetailLaporanDplPage() {
             tanggal_disetujui: status === 'Disetujui' ? new Date().toISOString() : null,
         });
         toast.success(`Laporan telah ditandai sebagai "${status}"`);
-        router.push(backUrl); // Gunakan URL dinamis
+        router.push(backUrl);
     } catch (error) {
         toast.error("Gagal memperbarui status laporan.");
         console.error("Update error:", error);
@@ -116,7 +118,63 @@ export default function DetailLaporanDplPage() {
   }
   
   const handleDownloadDocx = async () => {
-    // ... (Logika download tidak berubah)
+    if (!laporan) {
+        toast.error("Data laporan belum lengkap untuk membuat dokumen.");
+        return;
+    }
+    
+    const { expand, judul_kegiatan, tanggal_kegiatan, tempat_pelaksanaan, narasumber, status, deskripsi_kegiatan, mahasiswa_terlibat, rencana_tindak_lanjut, catatan_dpl } = laporan;
+    // Diperbarui: Menggunakan optional chaining di setiap tingkat
+    const ketua = expand?.kelompok?.expand?.ketua;
+    const dpl = expand?.kelompok?.expand?.dpl;
+    const anggota = expand?.kelompok?.anggota || [];
+    const prodiKetua = ketua?.expand?.prodi?.nama_prodi || 'N/A';
+    const stripHtml = (html: string) => html ? html.replace(/<[^>]*>?/gm, '') : '';
+
+    const doc = new Document({
+        sections: [{
+            children: [
+                new Paragraph({ text: "LAPORAN KEGIATAN PENGABDIAN", heading: HeadingLevel.HEADING_1, alignment: "center" }),
+                new Paragraph({ text: judul_kegiatan, heading: HeadingLevel.HEADING_2, alignment: "center" }),
+                new Paragraph({ text: "" }),
+                
+                new Paragraph({ children: [new TextRun({ text: "Tanggal Kegiatan: ", bold: true }), new TextRun({ text: new Date(tanggal_kegiatan).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' }) })] }),
+                new Paragraph({ children: [new TextRun({ text: "Bidang Pengabdian: ", bold: true }), new TextRun({ text: expand?.bidang_penelitian?.nama_bidang || '-' })] }),
+                new Paragraph({ children: [new TextRun({ text: "Tempat Pelaksanaan: ", bold: true }), new TextRun({ text: tempat_pelaksanaan })] }),
+                new Paragraph({ children: [new TextRun({ text: "Narasumber: ", bold: true }), new TextRun({ text: narasumber || '-' })] }),
+                new Paragraph({ children: [new TextRun({ text: "Status Laporan: ", bold: true }), new TextRun({ text: status })] }),
+                new Paragraph({ text: "" }),
+
+                new Paragraph({ children: [new TextRun({ text: "Informasi Kelompok", bold: true })] }),
+                new Paragraph({ children: [new TextRun({ text: "Ketua Kelompok: ", bold: true }), new TextRun({ text: `${ketua?.nama_lengkap || 'N/A'} (${ketua?.nim || 'NIM tidak ada'}) - ${prodiKetua}` })] }),
+                new Paragraph({ children: [new TextRun({ text: "DPL: ", bold: true }), new TextRun({ text: dpl?.nama_lengkap || 'Belum Ditugaskan' })] }),
+                new Paragraph({ children: [new TextRun({ text: "Anggota:", bold: true })] }),
+                ...anggota.map(a => new Paragraph({ text: `- ${a.nama} (${a.nim}) - ${a.prodiNama}`, bullet: { level: 0 }})),
+                new Paragraph({ text: "" }),
+
+                new Paragraph({ children: [new TextRun({ text: "Deskripsi Kegiatan", bold: true })] }),
+                new Paragraph({ text: stripHtml(deskripsi_kegiatan) }),
+                new Paragraph({ text: "" }),
+
+                new Paragraph({ children: [new TextRun({ text: "Mahasiswa Terlibat", bold: true })] }),
+                ...mahasiswa_terlibat.map(nama => new Paragraph({ text: `- ${nama}`, bullet: { level: 0 }})),
+                new Paragraph({ text: "" }),
+
+                new Paragraph({ children: [new TextRun({ text: "Rencana Tindak Lanjut", bold: true })] }),
+                new Paragraph({ text: rencana_tindak_lanjut || '-' }),
+                new Paragraph({ text: "" }),
+
+                ...(catatan_dpl ? [
+                    new Paragraph({ children: [new TextRun({ text: "Catatan Revisi dari DPL", bold: true })] }),
+                    new Paragraph({ children: [new TextRun({ text: catatan_dpl, italics: true })] }),
+                ] : []),
+            ],
+        }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `laporan-${judul_kegiatan.replace(/ /g, "_")}.docx`);
+    toast.success("Dokumen berhasil diunduh!");
   };
 
   if (isLoading) {
@@ -130,10 +188,9 @@ export default function DetailLaporanDplPage() {
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-6 grid gap-6">
       <div className="mb-6 flex justify-between items-center">
-        {/* Diperbarui: Menggunakan URL dinamis untuk tombol kembali */}
         <Link href={backUrl}>
           <Button variant="outline" size="sm"><IconChevronLeft className="h-4 w-4 mr-1" />
-            {pb.authStore.model?.role === 'lppm' ? 'Kembali ke Manajemen Laporan' : 'Kembali ke Daftar Verifikasi'}
+            {currentUserRole === 'lppm' ? 'Kembali ke Manajemen Laporan' : 'Kembali ke Daftar Verifikasi'}
           </Button>
         </Link>
         <Button variant="outline" onClick={handleDownloadDocx}>
@@ -143,7 +200,6 @@ export default function DetailLaporanDplPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* ... (sisa kode JSX tidak berubah) ... */}
         <div className="lg:col-span-2">
             <Card>
                 <CardHeader>
@@ -182,34 +238,36 @@ export default function DetailLaporanDplPage() {
             </Card>
         </div>
 
-        <div className="lg:col-span-1">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Aksi Verifikasi</CardTitle>
-                    <CardDescription>Berikan catatan dan setujui atau minta revisi untuk laporan ini.</CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-4">
-                    <div>
-                        <Label htmlFor="catatan_dpl">Catatan/Feedback</Label>
-                        <Textarea 
-                            id="catatan_dpl"
-                            placeholder="Tulis catatan di sini jika ada revisi..."
-                            rows={8}
-                            value={catatan}
-                            onChange={(e) => setCatatan(e.target.value)}
-                        />
-                    </div>
-                    <div className="grid gap-2">
-                        <Button onClick={() => handleVerifikasi('Disetujui')} disabled={isSubmitting}>
-                            {isSubmitting ? 'Memproses...' : 'Setujui Laporan'}
-                        </Button>
-                        <Button variant="destructive" onClick={() => handleVerifikasi('Revisi')} disabled={isSubmitting}>
-                            {isSubmitting ? 'Memproses...' : 'Minta Revisi'}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
+        {currentUserRole === 'dpl' && (
+            <div className="lg:col-span-1">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Aksi Verifikasi</CardTitle>
+                        <CardDescription>Berikan catatan dan setujui atau minta revisi untuk laporan ini.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4">
+                        <div>
+                            <Label htmlFor="catatan_dpl">Catatan/Feedback</Label>
+                            <Textarea 
+                                id="catatan_dpl"
+                                placeholder="Tulis catatan di sini jika ada revisi..."
+                                rows={8}
+                                value={catatan}
+                                onChange={(e) => setCatatan(e.target.value)}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Button onClick={() => handleVerifikasi('Disetujui')} disabled={isSubmitting}>
+                                {isSubmitting ? 'Memproses...' : 'Setujui Laporan'}
+                            </Button>
+                            <Button variant="destructive" onClick={() => handleVerifikasi('Revisi')} disabled={isSubmitting}>
+                                {isSubmitting ? 'Memproses...' : 'Minta Revisi'}
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        )}
       </div>
     </main>
   );
