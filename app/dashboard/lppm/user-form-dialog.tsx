@@ -23,6 +23,7 @@ interface UserPayload {
   nama_lengkap: string;
   email: string;
   role: string;
+  nim?: string;
   prodi?: string;
   password?: string;
   passwordConfirm?: string;
@@ -67,45 +68,46 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
     const form = e.currentTarget;
     const nama_lengkap = (form.elements.namedItem('nama_lengkap') as HTMLInputElement).value;
     const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+    const nim = (form.elements.namedItem('nim') as HTMLInputElement)?.value;
     const password = (form.elements.namedItem('password') as HTMLInputElement).value;
     const passwordConfirm = (form.elements.namedItem('passwordConfirm') as HTMLInputElement).value;
 
     try {
       if (isEditMode) {
-        // Diperbarui: Membuat objek data khusus untuk update
-        const updateData: Partial<UserPayload> = {
+        // Diperbarui: Logika pembaruan yang lebih aman dan terpisah
+        const dataToUpdate: Partial<UserPayload> = {
             nama_lengkap,
-            // Email tidak diikutsertakan dalam update untuk menghindari error
         };
-
         if (selectedRole === 'mahasiswa') {
-            updateData.prodi = selectedProdi;
+            dataToUpdate.nim = nim;
+            dataToUpdate.prodi = selectedProdi;
         }
 
+        // 1. Update data biasa terlebih dahulu
+        await pb.collection('users').update(user.id, dataToUpdate);
+
+        // 2. Jika password diisi, lakukan update terpisah khusus untuk password
         if (password) {
+            if (password.length < 8) {
+                toast.error("Password harus terdiri dari minimal 8 karakter.");
+                setIsLoading(false);
+                return;
+            }
             if (password !== passwordConfirm) {
                 toast.error("Password dan konfirmasi password tidak cocok.");
                 setIsLoading(false);
                 return;
             }
-            updateData.password = password;
-            updateData.passwordConfirm = passwordConfirm;
+            await pb.collection('users').update(user.id, { password, passwordConfirm });
         }
-
-        await pb.collection('users').update(user.id, updateData);
+        
         toast.success("Data pengguna berhasil diperbarui.");
       } else {
         // Logika untuk membuat pengguna baru (tetap sama)
         const createData: Partial<UserPayload> = {
-            nama_lengkap,
-            email,
-            role: selectedRole,
+            nama_lengkap, email, role: selectedRole, nim
         };
-
-        if (selectedRole === 'mahasiswa') {
-            createData.prodi = selectedProdi;
-        }
-
+        if (selectedRole === 'mahasiswa') createData.prodi = selectedProdi;
         if (password !== passwordConfirm) {
             toast.error("Password dan konfirmasi password tidak cocok.");
             setIsLoading(false);
@@ -124,7 +126,6 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
                 setIsLoading(false);
                 return;
             }
-            
             await pb.collection('kelompok_mahasiswa').create({
                 ketua: newUserRecord.id,
                 dpl: selectedDpl,
@@ -163,7 +164,6 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="email" className="text-right">Email</Label>
-            {/* Diperbarui: Email dibuat read-only saat mode edit */}
             <Input id="email" name="email" type="email" defaultValue={user?.email} className="col-span-3" required readOnly={isEditMode} />
           </div>
            <div className="grid grid-cols-4 items-center gap-4">
@@ -179,19 +179,25 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
             </Select>
           </div>
           {selectedRole === 'mahasiswa' && (
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="prodi" className="text-right">Prodi</Label>
-                <Select name="prodi" defaultValue={user?.prodi} onValueChange={setSelectedProdi} required>
-                    <SelectTrigger className="col-span-3">
-                        <SelectValue placeholder="Pilih prodi..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {prodiList.map(prodi => (
-                            <SelectItem key={prodi.id} value={prodi.id}>{prodi.nama_prodi}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </div>
+            <>
+              <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="nim" className="text-right">NIM</Label>
+                  <Input id="nim" name="nim" defaultValue={user?.nim} className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="prodi" className="text-right">Prodi</Label>
+                  <Select name="prodi" defaultValue={user?.prodi} onValueChange={setSelectedProdi} required>
+                      <SelectTrigger className="col-span-3">
+                          <SelectValue placeholder="Pilih prodi..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                          {prodiList.map(prodi => (
+                              <SelectItem key={prodi.id} value={prodi.id}>{prodi.nama_prodi}</SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
+              </div>
+            </>
           )}
           {selectedRole === 'mahasiswa' && !isEditMode && (
             <div className="grid grid-cols-4 items-center gap-4">
