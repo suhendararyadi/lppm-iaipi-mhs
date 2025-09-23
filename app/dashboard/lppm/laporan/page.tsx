@@ -1,14 +1,24 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { pb } from '@/lib/pocketbase';
-import { RecordModel, ClientResponseError } from 'pocketbase';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { IconFileText, IconEye } from '@tabler/icons-react';
+import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationEllipsis, 
+  PaginationItem, 
+  PaginationLink, 
+  PaginationNext, 
+  PaginationPrevious 
+} from "@/components/ui/pagination";
+import { IconFileText, IconEye } from "@tabler/icons-react";
+import { pb } from "@/lib/pocketbase";
+import { RecordModel, ClientResponseError } from "pocketbase";
 import { toast } from "sonner";
 
 // Tipe data yang diperluas
@@ -33,16 +43,20 @@ interface Laporan extends RecordModel {
 export default function LppmLaporanListPage() {
   const [laporans, setLaporans] = useState<Laporan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
 
-  const fetchAllLaporan = useCallback(async (signal?: AbortSignal) => {
+  const fetchAllLaporan = useCallback(async (page: number = 1, perPage: number = 10, signal?: AbortSignal) => {
     setIsLoading(true);
     try {
-      const laporanList = await pb.collection('laporans').getFullList<Laporan>({
+      const laporanList = await pb.collection('laporans').getList<Laporan>(page, perPage, {
           sort: '-updated',
           expand: 'kelompok,kelompok.ketua,kelompok.dpl',
           signal,
       });
-      setLaporans(laporanList);
+      setLaporans(laporanList.items);
+      setTotalItems(laporanList.totalItems);
     } catch (error) {
       if (!(error instanceof ClientResponseError && error.isAbort)) {
         console.error("Gagal memuat data laporan:", error);
@@ -55,9 +69,9 @@ export default function LppmLaporanListPage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchAllLaporan(controller.signal);
+    fetchAllLaporan(currentPage, itemsPerPage, controller.signal);
     return () => controller.abort();
-  }, [fetchAllLaporan]);
+  }, [fetchAllLaporan, currentPage, itemsPerPage]);
 
   const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -68,6 +82,47 @@ export default function LppmLaporanListPage() {
     }
   }
 
+  // Fungsi untuk menghitung total halaman
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+  // Fungsi untuk mengubah halaman
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  // Fungsi untuk mengubah jumlah item per halaman
+  const handleItemsPerPageChange = (value: string) => {
+    setItemsPerPage(parseInt(value));
+    setCurrentPage(1); // Reset ke halaman pertama
+  };
+
+  // Menghitung range data yang ditampilkan
+  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  // Fungsi untuk generate nomor halaman yang akan ditampilkan
+  const generatePageNumbers = () => {
+    const pages = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      const startPage = Math.max(1, currentPage - 2);
+      const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+    }
+    
+    return pages;
+  };
+
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-6">
       <Card>
@@ -76,6 +131,34 @@ export default function LppmLaporanListPage() {
           <CardDescription>Berikut adalah daftar semua laporan yang telah diinput oleh seluruh mahasiswa.</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Header dengan informasi dan kontrol pagination */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <div className="flex items-center gap-4">
+              <div className="text-sm text-muted-foreground">
+                {totalItems > 0 ? (
+                  <>Menampilkan {startItem}-{endItem} dari {totalItems} entri</>
+                ) : (
+                  <>Tidak ada data</>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Tampilkan:</span>
+              <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="15">15</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">per halaman</span>
+            </div>
+          </div>
+
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
@@ -112,6 +195,76 @@ export default function LppmLaporanListPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="mt-4">
+              <Pagination>
+                <PaginationContent>
+                  {/* Previous Button */}
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+
+                  {/* First Page */}
+                  {currentPage > 3 && (
+                    <>
+                      <PaginationItem>
+                        <PaginationLink onClick={() => handlePageChange(1)} className="cursor-pointer">
+                          1
+                        </PaginationLink>
+                      </PaginationItem>
+                      {currentPage > 4 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                    </>
+                  )}
+
+                  {/* Page Numbers */}
+                  {generatePageNumbers().map((pageNum) => (
+                    <PaginationItem key={pageNum}>
+                      <PaginationLink
+                        onClick={() => handlePageChange(pageNum)}
+                        isActive={currentPage === pageNum}
+                        className="cursor-pointer"
+                      >
+                        {pageNum}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+
+                  {/* Last Page */}
+                  {currentPage < totalPages - 2 && (
+                    <>
+                      {currentPage < totalPages - 3 && (
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      )}
+                      <PaginationItem>
+                        <PaginationLink onClick={() => handlePageChange(totalPages)} className="cursor-pointer">
+                          {totalPages}
+                        </PaginationLink>
+                      </PaginationItem>
+                    </>
+                  )}
+
+                  {/* Next Button */}
+                  <PaginationItem>
+                    <PaginationNext 
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </CardContent>
       </Card>
     </main>
