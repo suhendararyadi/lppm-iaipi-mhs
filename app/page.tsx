@@ -32,13 +32,13 @@ const Header = () => (
           <DropdownMenuItem asChild>
             <Link href="/login">
               <BookUser className="mr-2 h-4 w-4" />
-              <span>SI Pengabdian Mahasiswa</span>
+              <span>Aplikasi Laporan Pengabdian Mahasiswa</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <a href="http://slp2m.lppm.iaipersisgarut.ac.id" target="_blank" rel="noopener noreferrer">
+            <a href="https://lppm-app.iaipersisgarut.ac.id" target="_blank" rel="noopener noreferrer">
               <FileText className="mr-2 h-4 w-4" />
-              <span>SI Laporan Penelitian Dosen</span>
+              <span>Aplikasi Laporan Penelitian Dosen</span>
             </a>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -178,7 +178,7 @@ const AplikasiSection = () => (
             <div className="mx-auto grid max-w-5xl items-stretch gap-8 sm:grid-cols-2 md:gap-12 mt-12">
                 <Card className="flex flex-col">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><BookUser /> SI Pengabdian Mahasiswa</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><BookUser /> Aplikasi Laporan Pengabdian Mahasiswa</CardTitle>
                         <CardDescription>Platform untuk mahasiswa melaporkan kegiatan pengabdian, diverifikasi oleh DPL, dan dikelola oleh LPPM.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow">
@@ -192,15 +192,15 @@ const AplikasiSection = () => (
                 </Card>
                  <Card className="flex flex-col">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><FileText /> SI Laporan Penelitian Dosen</CardTitle>
+                        <CardTitle className="flex items-center gap-2"><FileText /> Aplikasi Laporan Penelitian Dosen</CardTitle>
                         <CardDescription>Sistem informasi untuk manajemen laporan penelitian, pengabdian, dan publikasi ilmiah oleh dosen.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex-grow">
                         <p className="text-sm text-muted-foreground">Akses platform khusus untuk dosen dalam melaporkan dan mengelola hasil Tridharma Perguruan Tinggi.</p>
                     </CardContent>
                     <div className="p-6 pt-0">
-                        <a href="http://slp2m.lppm.iaipersisgarut.ac.id" target="_blank" rel="noopener noreferrer">
-                            <Button className="w-full">Kunjungi SLP2M <ArrowRight className="ml-2 h-4 w-4" /></Button>
+                        <a href="https://lppm-app.iaipersisgarut.ac.id" target="_blank" rel="noopener noreferrer">
+                            <Button className="w-full">Kunjungi ALPD <ArrowRight className="ml-2 h-4 w-4" /></Button>
                         </a>
                     </div>
                 </Card>
