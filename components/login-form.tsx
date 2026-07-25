@@ -30,7 +30,17 @@ export function LoginForm({
 
     try {
       const authData = await pb.collection('users').authWithPassword(email, password);
-      
+
+      // Akun nonaktif tetap bisa lolos authWithPassword (PocketBase tidak tahu soal field
+      // custom ini), jadi tolak di sini + hapus sesi supaya tidak bisa masuk ke dashboard.
+      if (authData.record.status === 'nonaktif') {
+        pb.authStore.clear();
+        setNotification("");
+        setError("Akun Anda telah dinonaktifkan. Hubungi LPPM jika ini keliru.");
+        setIsLoading(false);
+        return;
+      }
+
       const role = authData.record.role;
 
       switch (role) {

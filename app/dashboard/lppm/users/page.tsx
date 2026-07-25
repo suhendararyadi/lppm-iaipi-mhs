@@ -8,9 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { IconUsers, IconUserPlus, IconEdit, IconTrash, IconFileImport, IconDotsVertical } from '@tabler/icons-react';
+import { IconUsers, IconUserPlus, IconEdit, IconTrash, IconFileImport, IconDotsVertical, IconUserOff, IconUserCheck } from '@tabler/icons-react';
 import { toast } from "sonner";
 import { UserFormDialog } from '../user-form-dialog';
 import { UserImportDialog } from '../user-import-dialog'; // REVISI: Impor komponen baru
@@ -19,6 +19,7 @@ interface User extends RecordModel {
     nama_lengkap: string;
     email: string;
     role: 'mahasiswa' | 'dpl' | 'lppm';
+    status?: 'aktif' | 'nonaktif';
 }
 
 export default function LppmUserManagementPage() {
@@ -57,10 +58,25 @@ export default function LppmUserManagementPage() {
     setIsFormDialogOpen(true);
   };
 
+  // Nonaktifkan adalah aksi default untuk akun yang sudah tidak dipakai — akun tidak bisa
+  // login lagi, tapi relasi (ketua/DPL di laporan lama) tetap utuh selamanya. Ini mencegah
+  // kolom "N/A" bermunculan di Manajemen Kelompok seperti yang terjadi saat akun di-hapus permanen.
+  const handleToggleStatus = async (user: User) => {
+    const statusBaru = user.status === 'nonaktif' ? 'aktif' : 'nonaktif';
+    try {
+      await pb.collection('users').update(user.id, { status: statusBaru });
+      toast.success(statusBaru === 'nonaktif' ? "Pengguna dinonaktifkan." : "Pengguna diaktifkan kembali.");
+      fetchUsers();
+    } catch (error) {
+      console.error("Gagal mengubah status pengguna:", error);
+      toast.error("Gagal mengubah status pengguna.");
+    }
+  };
+
   const handleDelete = (userId: string, userName: string) => {
-    toast.error(`Apakah Anda yakin ingin menghapus pengguna "${userName}"?`, {
+    toast.error(`Hapus permanen "${userName}"? Nama & email akan hilang dari riwayat kelompok/laporan lama. Pertimbangkan "Nonaktifkan" sebagai gantinya.`, {
       action: {
-        label: "Hapus",
+        label: "Hapus Permanen",
         onClick: async () => {
           try {
             await pb.collection('users').delete(userId);
@@ -102,18 +118,24 @@ export default function LppmUserManagementPage() {
                   <TableHead>Nama Lengkap</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Peran (Role)</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                    <TableRow><TableCell colSpan={4} className="text-center h-24">Memuat data pengguna...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center h-24">Memuat data pengguna...</TableCell></TableRow>
                 ) : users.length > 0 ? (
-                  users.map((user) => (
-                    <TableRow key={user.id}>
+                  users.map((user) => {
+                    const isNonaktif = user.status === 'nonaktif';
+                    return (
+                    <TableRow key={user.id} className={isNonaktif ? 'opacity-60' : ''}>
                       <TableCell className="font-medium">{user.nama_lengkap}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell><Badge variant={user.role === 'dpl' ? 'secondary' : user.role === 'lppm' ? 'default' : 'outline'}>{user.role}</Badge></TableCell>
+                      <TableCell>
+                        <Badge variant={isNonaktif ? 'destructive' : 'outline'}>{isNonaktif ? 'Nonaktif' : 'Aktif'}</Badge>
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -124,17 +146,27 @@ export default function LppmUserManagementPage() {
                               <IconEdit className="h-4 w-4" /> Edit
                             </DropdownMenuItem>
                             {pb.authStore.model?.id !== user.id && (
-                              <DropdownMenuItem variant="destructive" onClick={() => handleDelete(user.id, user.nama_lengkap)}>
-                                <IconTrash className="h-4 w-4" /> Hapus
-                              </DropdownMenuItem>
+                              <>
+                                <DropdownMenuItem onClick={() => handleToggleStatus(user)}>
+                                  {isNonaktif ? (
+                                    <><IconUserCheck className="h-4 w-4" /> Aktifkan</>
+                                  ) : (
+                                    <><IconUserOff className="h-4 w-4" /> Nonaktifkan</>
+                                  )}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem variant="destructive" onClick={() => handleDelete(user.id, user.nama_lengkap)}>
+                                  <IconTrash className="h-4 w-4" /> Hapus Permanen
+                                </DropdownMenuItem>
+                              </>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                  );})
                 ) : (
-                  <TableRow><TableCell colSpan={4} className="text-center h-24">Tidak ada data pengguna.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={5} className="text-center h-24">Tidak ada data pengguna.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

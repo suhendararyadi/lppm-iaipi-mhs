@@ -104,6 +104,7 @@ export function UserImportDialog({ isOpen, onOpenChange, onImportSuccess }: User
     // Sebelumnya getFullList dipanggil di dalam loop per-baris → boros request.
     const prodiMap = new Map<string, string>();
     const dplMap = new Map<string, string>();
+    const dplNamaMap = new Map<string, string>();
     let activePeriodeId = '';
     if (importRole === 'mahasiswa') {
       try {
@@ -114,7 +115,10 @@ export function UserImportDialog({ isOpen, onOpenChange, onImportSuccess }: User
         // Catatan: email hanya terbaca jika record DPL punya emailVisibility=true.
         dplList.forEach(d => {
           const key = String(d.email ?? '').trim().toLowerCase();
-          if (key) dplMap.set(key, d.id);
+          if (key) {
+            dplMap.set(key, d.id);
+            dplNamaMap.set(key, String(d.nama_lengkap ?? ''));
+          }
         });
         activePeriodeId = periodeAktif.items[0]?.id ?? '';
         if (!activePeriodeId) {
@@ -146,16 +150,25 @@ export function UserImportDialog({ isOpen, onOpenChange, onImportSuccess }: User
             email: String(user.email).trim(),
             nim: String(user.nim ?? '').trim(),
             emailVisibility: true,
+            // Field status tidak punya default value di PocketBase — wajib diisi eksplisit,
+            // kalau tidak akun baru tidak akan bisa login sama sekali.
+            status: 'aktif',
             password: user.password_default, passwordConfirm: user.password_default,
             role: 'mahasiswa', prodi: prodiId,
           });
-          await pb.collection('kelompok_mahasiswa').create({ ketua: newUser.id, dpl: dplId, anggota: [], periode: activePeriodeId });
+          await pb.collection('kelompok_mahasiswa').create({
+            ketua: newUser.id, dpl: dplId, anggota: [], periode: activePeriodeId,
+            // Snapshot nama supaya identitas ketua/DPL tidak hilang kalau akunnya suatu saat dihapus.
+            ketua_nama: String(user.nama_lengkap).trim(),
+            dpl_nama: dplNamaMap.get(String(user.dpl_email ?? '').trim().toLowerCase()) ?? '',
+          });
 
         } else { // Logika untuk impor DPL
           await pb.collection('users').create({
             nama_lengkap: String(user.nama_lengkap).trim(),
             email: String(user.email).trim(),
             emailVisibility: true,
+            status: 'aktif',
             password: user.password_default,
             passwordConfirm: user.password_default,
             role: 'dpl',

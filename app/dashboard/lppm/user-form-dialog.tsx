@@ -28,6 +28,7 @@ interface UserPayload {
   password?: string;
   passwordConfirm?: string;
   emailVisibility?: boolean;
+  status?: 'aktif' | 'nonaktif';
 }
 
 export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: UserFormDialogProps) {
@@ -116,6 +117,9 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
         const createData: Partial<UserPayload> = {
             nama_lengkap, email, role: selectedRole, nim,
             emailVisibility: true,
+            // Field status tidak punya default value di PocketBase — wajib diisi eksplisit
+            // di sini, kalau tidak akun baru tidak akan bisa login sama sekali.
+            status: 'aktif',
         };
         if (selectedRole === 'mahasiswa') createData.prodi = selectedProdi;
         if (password !== passwordConfirm) {
@@ -141,6 +145,9 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
                 dpl: selectedDpl,
                 anggota: [],
                 periode: activePeriodeId,
+                // Snapshot nama supaya identitas ketua/DPL tidak hilang kalau akunnya suatu saat dihapus.
+                ketua_nama: newUserRecord.nama_lengkap,
+                dpl_nama: dplList.find(d => d.id === selectedDpl)?.nama_lengkap ?? '',
             });
             toast.info(`Kelompok untuk ${newUserRecord.nama_lengkap} telah dibuat & DPL ditugaskan.`);
         }

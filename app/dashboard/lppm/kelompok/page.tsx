@@ -6,7 +6,8 @@ import { RecordModel, ClientResponseError } from 'pocketbase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IconUsersGroup } from '@tabler/icons-react';
+import { Badge } from '@/components/ui/badge';
+import { IconUsersGroup, IconAlertTriangle } from '@tabler/icons-react';
 import { toast } from "sonner";
 
 interface User extends RecordModel {
@@ -14,10 +15,24 @@ interface User extends RecordModel {
 }
 interface Kelompok extends RecordModel {
     anggota: { nama: string }[];
+    // Snapshot nama, diisi saat ketua/DPL ditetapkan — tetap ada meski akun user aslinya
+    // kemudian dihapus, karena relasi ketua/dpl tidak cascade-delete (lihat memori project).
+    ketua_nama?: string;
+    dpl_nama?: string;
     expand?: {
-        ketua: User;
+        ketua?: User;
         dpl?: User;
     }
+}
+
+// Menentukan nama tampilan + status untuk kolom Ketua/DPL:
+// - "live": relasi masih ada, tampilkan nama biasa
+// - "snapshot": relasi sudah kosong (akun dihapus) tapi nama sempat tersimpan
+// - "unknown": tidak ada relasi maupun snapshot (data lama sebelum fitur ini ada)
+function resolveIdentitas(live?: string, snapshot?: string): { nama: string; status: 'live' | 'snapshot' | 'unknown' } {
+  if (live) return { nama: live, status: 'live' };
+  if (snapshot) return { nama: snapshot, status: 'snapshot' };
+  return { nama: 'Tidak diketahui', status: 'unknown' };
 }
 
 export default function LppmKelompokManagementPage() {
@@ -59,7 +74,9 @@ export default function LppmKelompokManagementPage() {
 
   const handleAssignDpl = async (kelompokId: string, dplId: string) => {
     try {
-      await pb.collection('kelompok_mahasiswa').update(kelompokId, { dpl: dplId });
+      // Snapshot nama ikut diperbarui supaya identitas tidak hilang kalau akun DPL ini dihapus nanti.
+      const dplNama = dplList.find(d => d.id === dplId)?.nama_lengkap ?? '';
+      await pb.collection('kelompok_mahasiswa').update(kelompokId, { dpl: dplId, dpl_nama: dplNama });
       toast.success("DPL berhasil ditugaskan.");
       fetchData(); // Refresh data
     } catch (error) {
@@ -69,6 +86,8 @@ export default function LppmKelompokManagementPage() {
     }
   };
 
+  const jumlahBermasalah = kelompokList.filter(k => !k.expand?.ketua || !k.expand?.dpl).length;
+
   return (
     <main className="flex-1 overflow-y-auto p-4 md:p-6">
       <Card>
@@ -77,6 +96,15 @@ export default function LppmKelompokManagementPage() {
           <CardDescription>Tugaskan Dosen Pembimbing Lapangan (DPL) untuk setiap kelompok mahasiswa.</CardDescription>
         </CardHeader>
         <CardContent>
+          {!isLoading && jumlahBermasalah > 0 && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200">
+              <IconAlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>
+                {jumlahBermasalah} dari {kelompokList.length} kelompok kehilangan akun ketua dan/atau DPL karena akunnya sudah dihapus.
+                Nama yang ditandai <Badge variant="outline" className="mx-1 align-middle">akun dihapus</Badge> diambil dari data yang sempat tersimpan, bukan akun yang masih aktif.
+              </span>
+            </div>
+          )}
           <div className="border rounded-lg overflow-hidden">
             <Table>
               <TableHeader>
@@ -91,11 +119,26 @@ export default function LppmKelompokManagementPage() {
                 {isLoading ? (
                     <TableRow><TableCell colSpan={4} className="text-center h-24">Memuat data kelompok...</TableCell></TableRow>
                 ) : kelompokList.length > 0 ? (
-                  kelompokList.map((kelompok) => (
+                  kelompokList.map((kelompok) => {
+                    const ketuaInfo = resolveIdentitas(kelompok.expand?.ketua?.nama_lengkap, kelompok.ketua_nama);
+                    const dplInfo = resolveIdentitas(kelompok.expand?.dpl?.nama_lengkap, kelompok.dpl_nama);
+                    return (
                     <TableRow key={kelompok.id}>
-                      <TableCell className="font-medium">{kelompok.expand?.ketua?.nama_lengkap || 'N/A'}</TableCell>
+                      <TableCell className="font-medium">
+                        <span className={ketuaInfo.status === 'unknown' ? 'text-muted-foreground' : ''}>{ketuaInfo.nama}</span>
+                        {ketuaInfo.status === 'snapshot' && <Badge variant="outline" className="ml-2">akun dihapus</Badge>}
+                      </TableCell>
                       <TableCell>{kelompok.anggota?.length ?? 0} Anggota</TableCell>
-                      <TableCell>{kelompok.expand?.dpl?.nama_lengkap || <span className="text-muted-foreground">Belum ada</span>}</TableCell>
+                      <TableCell>
+                        {dplInfo.status === 'unknown' ? (
+                          <span className="text-muted-foreground">Belum ada</span>
+                        ) : (
+                          <>
+                            {dplInfo.nama}
+                            {dplInfo.status === 'snapshot' && <Badge variant="outline" className="ml-2">akun dihapus</Badge>}
+                          </>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Select
                           defaultValue={kelompok.expand?.dpl?.id}
@@ -112,7 +155,7 @@ export default function LppmKelompokManagementPage() {
                         </Select>
                       </TableCell>
                     </TableRow>
-                  ))
+                  );})
                 ) : (
                   <TableRow><TableCell colSpan={4} className="text-center h-24">Tidak ada data kelompok.</TableCell></TableRow>
                 )}
