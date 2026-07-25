@@ -93,8 +93,8 @@ export default function LppmKelompokManagementPage() {
                 ) : kelompokList.length > 0 ? (
                   kelompokList.map((kelompok) => (
                     <TableRow key={kelompok.id}>
-                      <TableCell className="font-medium">{kelompok.expand?.ketua.nama_lengkap || 'N/A'}</TableCell>
-                      <TableCell>{kelompok.anggota.length} Anggota</TableCell>
+                      <TableCell className="font-medium">{kelompok.expand?.ketua?.nama_lengkap || 'N/A'}</TableCell>
+                      <TableCell>{kelompok.anggota?.length ?? 0} Anggota</TableCell>
                       <TableCell>{kelompok.expand?.dpl?.nama_lengkap || <span className="text-muted-foreground">Belum ada</span>}</TableCell>
                       <TableCell>
                         <Select
