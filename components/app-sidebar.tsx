@@ -5,6 +5,7 @@ import { pb } from "@/lib/pocketbase";
 import {
   IconLayoutDashboard, IconFileText, IconUsers, IconSettings, IconHelp,
   IconBuildingCommunity, IconFileCheck, IconHistory, IconBooks, IconUsersGroup, IconPrinter, IconSchool, IconChartBar,
+  IconCalendarStats,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -50,6 +51,7 @@ const dataLppm = {
     { title: "Manajemen Laporan", url: "/dashboard/lppm/laporan", icon: IconFileText },
     { title: "Manajemen Pengguna", url: "/dashboard/lppm/users", icon: IconUsers },
     { title: "Manajemen Kelompok", url: "/dashboard/lppm/kelompok", icon: IconUsersGroup },
+    { title: "Kelola Periode", url: "/dashboard/lppm/periode", icon: IconCalendarStats },
     { title: "Manajemen Prodi", url: "/dashboard/lppm/prodi", icon: IconSchool },
     { title: "Bidang Pengabdian", url: "/dashboard/lppm/bidang", icon: IconBooks },
     { title: "Cetak Laporan", url: "/dashboard/lppm/cetak", icon: IconPrinter },

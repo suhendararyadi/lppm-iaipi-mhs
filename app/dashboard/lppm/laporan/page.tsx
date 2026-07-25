@@ -40,6 +40,11 @@ interface Laporan extends RecordModel {
     }
 }
 
+interface Periode extends RecordModel {
+    nama: string;
+    status: "aktif" | "arsip";
+}
+
 export default function LppmLaporanListPage() {
   const [laporans, setLaporans] = useState<Laporan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,12 +52,35 @@ export default function LppmLaporanListPage() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
 
-  const fetchAllLaporan = useCallback(async (page: number = 1, perPage: number = 10, signal?: AbortSignal) => {
+  const [periodeList, setPeriodeList] = useState<Periode[]>([]);
+  const [selectedPeriodeId, setSelectedPeriodeId] = useState<string>("");
+
+  // Muat daftar periode sekali di awal; defaultkan filter ke periode aktif
+  // supaya laporan sesi berjalan tidak tercampur dengan sesi yang sudah diarsipkan.
+  useEffect(() => {
+    const controller = new AbortController();
+    pb.collection('periode')
+      .getFullList<Periode>({ sort: '-created', signal: controller.signal })
+      .then((periodes) => {
+        setPeriodeList(periodes);
+        const aktif = periodes.find((p) => p.status === 'aktif');
+        setSelectedPeriodeId(aktif ? aktif.id : 'all');
+      })
+      .catch((error) => {
+        if (!(error instanceof ClientResponseError && error.isAbort)) {
+          console.error("Gagal memuat data periode:", error);
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
+  const fetchAllLaporan = useCallback(async (page: number = 1, perPage: number = 10, periodeId: string = 'all', signal?: AbortSignal) => {
     setIsLoading(true);
     try {
       const laporanList = await pb.collection('laporans').getList<Laporan>(page, perPage, {
           sort: '-updated',
           expand: 'kelompok,kelompok.ketua,kelompok.dpl',
+          filter: periodeId && periodeId !== 'all' ? pb.filter('kelompok.periode = {:pid}', { pid: periodeId }) : '',
           signal,
       });
       setLaporans(laporanList.items);
@@ -68,10 +96,17 @@ export default function LppmLaporanListPage() {
   }, []);
 
   useEffect(() => {
+    // Tunggu periode aktif terdeteksi (atau fallback 'all') sebelum memuat laporan pertama kali
+    if (!selectedPeriodeId) return;
     const controller = new AbortController();
-    fetchAllLaporan(currentPage, itemsPerPage, controller.signal);
+    fetchAllLaporan(currentPage, itemsPerPage, selectedPeriodeId, controller.signal);
     return () => controller.abort();
-  }, [fetchAllLaporan, currentPage, itemsPerPage]);
+  }, [fetchAllLaporan, currentPage, itemsPerPage, selectedPeriodeId]);
+
+  const handlePeriodeChange = (value: string) => {
+    setSelectedPeriodeId(value);
+    setCurrentPage(1);
+  };
 
   const getStatusBadgeVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -131,6 +166,24 @@ export default function LppmLaporanListPage() {
           <CardDescription>Berikut adalah daftar semua laporan yang telah diinput oleh seluruh mahasiswa.</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Filter periode/sesi */}
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">Sesi:</span>
+            <Select value={selectedPeriodeId || undefined} onValueChange={handlePeriodeChange}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Pilih sesi..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Sesi</SelectItem>
+                {periodeList.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nama}{p.status === 'arsip' ? ' (Arsip)' : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Header dengan informasi dan kontrol pagination */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
             <div className="flex items-center gap-4">

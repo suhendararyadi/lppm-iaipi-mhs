@@ -37,18 +37,21 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
   const [selectedRole, setSelectedRole] = useState(user?.role || '');
   const [selectedDpl, setSelectedDpl] = useState('');
   const [selectedProdi, setSelectedProdi] = useState(user?.prodi || '');
+  const [activePeriodeId, setActivePeriodeId] = useState('');
   const isEditMode = !!user;
 
   useEffect(() => {
     if (isOpen) {
       const fetchData = async () => {
         try {
-          const [dpls, prodis] = await Promise.all([
+          const [dpls, prodis, periodeAktif] = await Promise.all([
             pb.collection('users').getFullList({ filter: 'role = "dpl"' }),
-            pb.collection('program_studi').getFullList({ sort: 'nama_prodi' })
+            pb.collection('program_studi').getFullList({ sort: 'nama_prodi' }),
+            pb.collection('periode').getList(1, 1, { filter: 'status = "aktif"' }),
           ]);
           setDplList(dpls);
           setProdiList(prodis);
+          setActivePeriodeId(periodeAktif.items[0]?.id ?? '');
         } catch (error) {
           console.error("Gagal memuat data DPL/Prodi:", error);
           toast.error("Gagal memuat data DPL atau Prodi.");
@@ -104,6 +107,11 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
         
         toast.success("Data pengguna berhasil diperbarui.");
       } else {
+        if (selectedRole === 'mahasiswa' && !activePeriodeId) {
+            toast.error("Belum ada sesi/periode aktif. Buat sesi di halaman Kelola Periode sebelum menambah mahasiswa.");
+            setIsLoading(false);
+            return;
+        }
         // Logika untuk membuat pengguna baru (tetap sama)
         const createData: Partial<UserPayload> = {
             nama_lengkap, email, role: selectedRole, nim,
@@ -132,6 +140,7 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
                 ketua: newUserRecord.id,
                 dpl: selectedDpl,
                 anggota: [],
+                periode: activePeriodeId,
             });
             toast.info(`Kelompok untuk ${newUserRecord.nama_lengkap} telah dibuat & DPL ditugaskan.`);
         }

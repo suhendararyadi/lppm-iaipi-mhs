@@ -104,19 +104,28 @@ export function UserImportDialog({ isOpen, onOpenChange, onImportSuccess }: User
     // Sebelumnya getFullList dipanggil di dalam loop per-baris → boros request.
     const prodiMap = new Map<string, string>();
     const dplMap = new Map<string, string>();
+    let activePeriodeId = '';
     if (importRole === 'mahasiswa') {
       try {
         const prodiList = await pb.collection('program_studi').getFullList();
         const dplList = await pb.collection('users').getFullList({ filter: 'role = "dpl"' });
+        const periodeAktif = await pb.collection('periode').getList(1, 1, { filter: 'status = "aktif"' });
         prodiList.forEach(p => prodiMap.set(String(p.nama_prodi).trim().toLowerCase(), p.id));
         // Catatan: email hanya terbaca jika record DPL punya emailVisibility=true.
         dplList.forEach(d => {
           const key = String(d.email ?? '').trim().toLowerCase();
           if (key) dplMap.set(key, d.id);
         });
+        activePeriodeId = periodeAktif.items[0]?.id ?? '';
+        if (!activePeriodeId) {
+          toast.dismiss();
+          toast.error("Belum ada sesi/periode aktif. Buat sesi di halaman Kelola Periode sebelum mengimpor mahasiswa.");
+          setIsLoading(false);
+          return;
+        }
       } catch {
         toast.dismiss();
-        toast.error("Gagal memuat data Prodi/DPL dari server. Impor dibatalkan.");
+        toast.error("Gagal memuat data Prodi/DPL/Periode dari server. Impor dibatalkan.");
         setIsLoading(false);
         return;
       }
@@ -140,7 +149,7 @@ export function UserImportDialog({ isOpen, onOpenChange, onImportSuccess }: User
             password: user.password_default, passwordConfirm: user.password_default,
             role: 'mahasiswa', prodi: prodiId,
           });
-          await pb.collection('kelompok_mahasiswa').create({ ketua: newUser.id, dpl: dplId, anggota: [] });
+          await pb.collection('kelompok_mahasiswa').create({ ketua: newUser.id, dpl: dplId, anggota: [], periode: activePeriodeId });
 
         } else { // Logika untuk impor DPL
           await pb.collection('users').create({
