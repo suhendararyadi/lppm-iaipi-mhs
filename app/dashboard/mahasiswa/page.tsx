@@ -23,6 +23,8 @@ export default function MahasiswaDashboardPage() {
   const [laporans, setLaporans] = useState<Laporan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [userName, setUserName] = useState('');
+  // Sesi/periode kelompok sudah diarsipkan -> laporan baru tidak boleh dibuat lagi.
+  const [isPeriodeArsip, setIsPeriodeArsip] = useState(false);
 
   const fetchData = useCallback(async (signal?: AbortSignal) => {
     const user = pb.authStore.model;
@@ -36,7 +38,8 @@ export default function MahasiswaDashboardPage() {
     try {
       // Disesuaikan: Logika pembuatan kelompok otomatis dihapus.
       // Sekarang hanya mencoba mengambil data kelompok yang sudah ada.
-      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal });
+      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal, expand: 'periode' });
+      setIsPeriodeArsip(kelompokRecord.expand?.periode?.status === 'arsip');
 
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
           filter: `kelompok.id="${kelompokRecord.id}"`,
@@ -125,9 +128,26 @@ export default function MahasiswaDashboardPage() {
         <Card className="lg:col-span-3">
             <CardHeader><CardTitle>Aksi Cepat</CardTitle><CardDescription>Akses cepat ke fitur-fitur utama.</CardDescription></CardHeader>
             <CardContent className="grid gap-4">
-                <Link href="/dashboard/mahasiswa/laporan/baru"><Button className="w-full justify-start gap-2"><IconPlus />Buat Laporan Baru</Button></Link>
+                {isPeriodeArsip ? (
+                  <Button className="w-full justify-start gap-2" disabled title="Sesi Anda sudah diarsipkan">
+                    <IconPlus />Buat Laporan Baru
+                  </Button>
+                ) : (
+                  <Link href="/dashboard/mahasiswa/laporan/baru"><Button className="w-full justify-start gap-2"><IconPlus />Buat Laporan Baru</Button></Link>
+                )}
                 <Link href="/dashboard/mahasiswa/laporan"><Button variant="secondary" className="w-full justify-start gap-2"><IconFileText />Lihat Semua Laporan</Button></Link>
-                <Link href="/dashboard/mahasiswa/anggota"><Button variant="outline" className="w-full justify-start gap-2"><IconUsers />Kelola Anggota Kelompok</Button></Link>
+                {isPeriodeArsip ? (
+                  <Button variant="outline" className="w-full justify-start gap-2" disabled title="Sesi Anda sudah diarsipkan">
+                    <IconUsers />Kelola Anggota Kelompok
+                  </Button>
+                ) : (
+                  <Link href="/dashboard/mahasiswa/anggota"><Button variant="outline" className="w-full justify-start gap-2"><IconUsers />Kelola Anggota Kelompok</Button></Link>
+                )}
+                {isPeriodeArsip && (
+                  <p className="text-xs text-muted-foreground">
+                    Sesi pengabdian Anda sudah diarsipkan oleh LPPM. Laporan lama tetap bisa dilihat, tapi tidak bisa diubah.
+                  </p>
+                )}
             </CardContent>
         </Card>
       </div>

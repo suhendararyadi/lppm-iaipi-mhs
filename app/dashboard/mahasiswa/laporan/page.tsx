@@ -37,6 +37,9 @@ interface Kelompok extends RecordModel {
         },
         dpl?: {
             nama_lengkap: string;
+        },
+        periode?: {
+            status: 'aktif' | 'arsip';
         }
     }
 }
@@ -70,8 +73,8 @@ export default function LaporanListPage() {
     }
     setIsLoading(true);
     try {
-      // Diperbarui: Menambahkan expand untuk prodi ketua
-      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'ketua,dpl,ketua.prodi' });
+      // Diperbarui: Menambahkan expand untuk prodi ketua & periode (cek status arsip)
+      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'ketua,dpl,ketua.prodi,periode' });
       setKelompok(kelompokRecord);
       
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
@@ -179,6 +182,8 @@ export default function LaporanListPage() {
     toast.success("Dokumen berhasil diunduh!");
   };
 
+  const isPeriodeArsip = kelompok?.expand?.periode?.status === 'arsip';
+
   const getStatusBadgeVariant = (status: Laporan['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
         case 'Disetujui': return 'default';
@@ -201,9 +206,13 @@ export default function LaporanListPage() {
               <IconDownload className="mr-2 h-4 w-4" />
               Download Rekap
             </Button>
-            <Link href="/dashboard/mahasiswa/laporan/baru">
-              <Button>Buat Laporan Baru</Button>
-            </Link>
+            {isPeriodeArsip ? (
+              <Button disabled title="Sesi Anda sudah diarsipkan">Buat Laporan Baru</Button>
+            ) : (
+              <Link href="/dashboard/mahasiswa/laporan/baru">
+                <Button>Buat Laporan Baru</Button>
+              </Link>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -239,12 +248,23 @@ export default function LaporanListPage() {
                                 <IconEye className="h-4 w-4" /> Lihat
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}/edit`}>
+                            {isPeriodeArsip ? (
+                              <DropdownMenuItem disabled title="Sesi sudah diarsipkan">
                                 <IconPencil className="h-4 w-4" /> Edit
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem variant="destructive" onClick={() => handleDelete(laporan.id, laporan.judul_kegiatan)}>
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem asChild>
+                                <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}/edit`}>
+                                  <IconPencil className="h-4 w-4" /> Edit
+                                </Link>
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem
+                              variant="destructive"
+                              disabled={isPeriodeArsip}
+                              title={isPeriodeArsip ? "Sesi sudah diarsipkan" : undefined}
+                              onClick={() => handleDelete(laporan.id, laporan.judul_kegiatan)}
+                            >
                               <IconTrash className="h-4 w-4" /> Hapus
                             </DropdownMenuItem>
                           </DropdownMenuContent>

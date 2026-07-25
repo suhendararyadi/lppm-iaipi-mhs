@@ -28,6 +28,11 @@ interface Anggota {
 interface Kelompok {
   id: string;
   anggota: Anggota[];
+  expand?: {
+    periode?: {
+      status: 'aktif' | 'arsip';
+    }
+  }
 }
 interface Laporan extends RecordModel {
     mahasiswa_terlibat: string[];
@@ -63,8 +68,8 @@ export default function EditLaporanPage() {
       const bidangList = await pb.collection('bidang_penelitian').getFullList<BidangPenelitian>({ sort: 'nama_bidang', signal });
       setBidangPenelitian(bidangList);
 
-      // Ambil data kelompok mahasiswa
-      const kelompokData = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal });
+      // Ambil data kelompok mahasiswa (+ periode untuk cek status arsip)
+      const kelompokData = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'periode' });
       setKelompok(kelompokData);
 
     } catch (error) {
@@ -119,6 +124,26 @@ export default function EditLaporanPage() {
 
   if (isLoading) {
     return <main className="flex-1 p-6"><div className="flex h-full items-center justify-center">Memuat formulir edit...</div></main>;
+  }
+
+  if (kelompok?.expand?.periode?.status === 'arsip') {
+    return (
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="mb-6">
+          <Link href={`/dashboard/mahasiswa/laporan/${laporanId}`}>
+            <Button variant="outline" size="sm"><IconChevronLeft className="h-4 w-4 mr-1" />Kembali ke Detail</Button>
+          </Link>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Sesi Sudah Diarsipkan</CardTitle>
+            <CardDescription>
+              Sesi pengabdian kelompok Anda sudah diarsipkan oleh LPPM sehingga laporan ini tidak bisa lagi diedit.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </main>
+    );
   }
 
   return (

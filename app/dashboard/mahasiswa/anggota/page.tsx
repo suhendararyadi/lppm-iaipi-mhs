@@ -48,7 +48,7 @@ export default function KelolaAnggotaPage() {
     }
     try {
       const [kelompokRecord, prodiData] = await Promise.all([
-        pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal }),
+        pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal, expand: 'periode' }),
         pb.collection('program_studi').getFullList<Prodi>({ sort: 'nama_prodi', signal })
       ]);
       
@@ -74,10 +74,16 @@ export default function KelolaAnggotaPage() {
     }
   }, [fetchData]);
   
+  const isPeriodeArsip = kelompok?.expand?.periode?.status === 'arsip';
+
   const handleTambahAnggota = async (e: FormEvent) => {
     e.preventDefault();
     if (!nama || !nim || !selectedProdi || !kelompok) {
         toast.error("Harap isi semua field yang diperlukan.");
+        return;
+    }
+    if (isPeriodeArsip) {
+        toast.error("Sesi Anda sudah diarsipkan, anggota kelompok tidak bisa diubah lagi.");
         return;
     }
 
@@ -117,6 +123,10 @@ export default function KelolaAnggotaPage() {
 
   const handleHapusAnggota = async (idToRemove: string) => {
     if (!kelompok) return;
+    if (isPeriodeArsip) {
+        toast.error("Sesi Anda sudah diarsipkan, anggota kelompok tidak bisa diubah lagi.");
+        return;
+    }
     const updatedAnggotaList = anggota.filter(a => a.id !== idToRemove);
     // Diperbaiki: Membuat objek baru secara eksplisit untuk menghindari error linter
     const dataToSave = updatedAnggotaList.map(item => ({
@@ -145,16 +155,21 @@ export default function KelolaAnggotaPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><IconUsers />Kelola Anggota Kelompok</CardTitle>
-          <CardDescription>Tambah, lihat, dan hapus anggota kelompok penelitian Anda.</CardDescription>
+          <CardDescription>
+            {isPeriodeArsip
+              ? "Sesi Anda sudah diarsipkan oleh LPPM — daftar anggota kelompok tidak bisa diubah lagi."
+              : "Tambah, lihat, dan hapus anggota kelompok penelitian Anda."}
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6">
+          <fieldset disabled={isPeriodeArsip} className="contents">
           <form onSubmit={handleTambahAnggota} className="grid md:grid-cols-4 gap-4 items-end p-4 border rounded-lg">
             <div className="grid gap-1.5"><Label htmlFor="nama">Nama Lengkap</Label><Input id="nama" value={nama} onChange={e => setNama(e.target.value)} placeholder="Nama anggota" required /></div>
             <div className="grid gap-1.5"><Label htmlFor="nim">NIM</Label><Input id="nim" value={nim} onChange={e => setNim(e.target.value)} placeholder="NIM" required /></div>
             {/* Diperbarui: Menggunakan Select untuk Prodi */}
             <div className="grid gap-1.5">
               <Label htmlFor="prodi">Program Studi</Label>
-              <Select value={selectedProdi} onValueChange={setSelectedProdi} required>
+              <Select value={selectedProdi} onValueChange={setSelectedProdi} required disabled={isPeriodeArsip}>
                 <SelectTrigger id="prodi">
                   <SelectValue placeholder="Pilih prodi..." />
                 </SelectTrigger>
@@ -183,6 +198,7 @@ export default function KelolaAnggotaPage() {
               </TableBody>
             </Table>
           </div>
+          </fieldset>
         </CardContent>
       </Card>
     </main>

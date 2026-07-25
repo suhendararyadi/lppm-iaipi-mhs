@@ -28,6 +28,11 @@ interface Anggota {
 interface Kelompok {
   id: string;
   anggota: Anggota[];
+  expand?: {
+    periode?: {
+      status: 'aktif' | 'arsip';
+    }
+  }
 }
 
 export default function BuatLaporanPage() {
@@ -49,9 +54,9 @@ export default function BuatLaporanPage() {
     try {
       const [bidangList, kelompokData] = await Promise.all([
         pb.collection('bidang_penelitian').getFullList<BidangPenelitian>({ sort: 'nama_bidang', signal }),
-        pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal })
+        pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'periode' })
       ]);
-      
+
       setBidangPenelitian(bidangList);
       setKelompok(kelompokData);
 
@@ -126,6 +131,29 @@ export default function BuatLaporanPage() {
 
   if (isFetching) {
     return <main className="flex-1 p-6"><div className="flex h-full items-center justify-center"><p>Memuat formulir...</p></div></main>;
+  }
+
+  if (kelompok?.expand?.periode?.status === 'arsip') {
+    return (
+      <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="mb-6">
+          <Link href="/dashboard/mahasiswa/laporan">
+            <Button variant="outline" size="sm">
+              <IconChevronLeft className="h-4 w-4 mr-1" />
+              Kembali ke Daftar Laporan
+            </Button>
+          </Link>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Sesi Sudah Diarsipkan</CardTitle>
+            <CardDescription>
+              Sesi pengabdian kelompok Anda sudah diarsipkan oleh LPPM sehingga tidak bisa lagi membuat laporan baru.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </main>
+    );
   }
 
   return (
