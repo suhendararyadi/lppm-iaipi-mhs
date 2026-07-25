@@ -100,24 +100,43 @@ export function UserImportDialog({ isOpen, onOpenChange, onImportSuccess }: User
     let errorCount = 0;
     const errors: string[] = [];
 
+    // Ambil data referensi SEKALI di luar loop (khusus impor mahasiswa).
+    // Sebelumnya getFullList dipanggil di dalam loop per-baris → boros request.
+    const prodiMap = new Map<string, string>();
+    const dplMap = new Map<string, string>();
+    if (importRole === 'mahasiswa') {
+      try {
+        const prodiList = await pb.collection('program_studi').getFullList();
+        const dplList = await pb.collection('users').getFullList({ filter: 'role = "dpl"' });
+        prodiList.forEach(p => prodiMap.set(String(p.nama_prodi).trim().toLowerCase(), p.id));
+        // Catatan: email hanya terbaca jika record DPL punya emailVisibility=true.
+        dplList.forEach(d => {
+          const key = String(d.email ?? '').trim().toLowerCase();
+          if (key) dplMap.set(key, d.id);
+        });
+      } catch {
+        toast.dismiss();
+        toast.error("Gagal memuat data Prodi/DPL dari server. Impor dibatalkan.");
+        setIsLoading(false);
+        return;
+      }
+    }
+
     // Logika impor utama
     for (const user of data) {
       try {
         if (importRole === 'mahasiswa') {
-          // Logika untuk impor mahasiswa (yang sudah ada)
-          const prodiList = await pb.collection('program_studi').getFullList();
-          const dplList = await pb.collection('users').getFullList({ filter: 'role = "dpl"' });
-          const prodiMap = new Map(prodiList.map(p => [p.nama_prodi.toLowerCase(), p.id]));
-          const dplMap = new Map(dplList.map(d => [d.email, d.id]));
-
-          const prodiId = prodiMap.get(user.prodi!.toLowerCase());
-          const dplId = dplMap.get(user.dpl_email!);
+          const prodiId = prodiMap.get(String(user.prodi ?? '').trim().toLowerCase());
+          const dplId = dplMap.get(String(user.dpl_email ?? '').trim().toLowerCase());
 
           if (!prodiId) throw new Error(`Prodi "${user.prodi}" tidak ditemukan.`);
           if (!dplId) throw new Error(`DPL dengan email "${user.dpl_email}" tidak ditemukan.`);
 
           const newUser = await pb.collection('users').create({
-            nama_lengkap: user.nama_lengkap, email: user.email, nim: user.nim,
+            nama_lengkap: String(user.nama_lengkap).trim(),
+            email: String(user.email).trim(),
+            nim: String(user.nim ?? '').trim(),
+            emailVisibility: true,
             password: user.password_default, passwordConfirm: user.password_default,
             role: 'mahasiswa', prodi: prodiId,
           });
@@ -125,8 +144,9 @@ export function UserImportDialog({ isOpen, onOpenChange, onImportSuccess }: User
 
         } else { // Logika untuk impor DPL
           await pb.collection('users').create({
-            nama_lengkap: user.nama_lengkap,
-            email: user.email,
+            nama_lengkap: String(user.nama_lengkap).trim(),
+            email: String(user.email).trim(),
+            emailVisibility: true,
             password: user.password_default,
             passwordConfirm: user.password_default,
             role: 'dpl',

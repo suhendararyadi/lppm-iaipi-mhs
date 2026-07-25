@@ -27,6 +27,7 @@ interface UserPayload {
   prodi?: string;
   password?: string;
   passwordConfirm?: string;
+  emailVisibility?: boolean;
 }
 
 export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: UserFormDialogProps) {
@@ -105,7 +106,8 @@ export function UserFormDialog({ isOpen, onOpenChange, onFormSubmit, user }: Use
       } else {
         // Logika untuk membuat pengguna baru (tetap sama)
         const createData: Partial<UserPayload> = {
-            nama_lengkap, email, role: selectedRole, nim
+            nama_lengkap, email, role: selectedRole, nim,
+            emailVisibility: true,
         };
         if (selectedRole === 'mahasiswa') createData.prodi = selectedProdi;
         if (password !== passwordConfirm) {
