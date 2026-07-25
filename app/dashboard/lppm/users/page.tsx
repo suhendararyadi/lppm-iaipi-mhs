@@ -7,7 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { IconUsers, IconUserPlus, IconEdit, IconTrash, IconFileImport } from '@tabler/icons-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { IconUsers, IconUserPlus, IconEdit, IconTrash, IconFileImport, IconDotsVertical } from '@tabler/icons-react';
 import { toast } from "sonner";
 import { UserFormDialog } from '../user-form-dialog';
 import { UserImportDialog } from '../user-import-dialog'; // REVISI: Impor komponen baru
@@ -111,11 +114,22 @@ export default function LppmUserManagementPage() {
                       <TableCell className="font-medium">{user.nama_lengkap}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell><Badge variant={user.role === 'dpl' ? 'secondary' : user.role === 'lppm' ? 'default' : 'outline'}>{user.role}</Badge></TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => handleOpenFormDialog(user)}><IconEdit className="h-4 w-4" /></Button>
-                        {pb.authStore.model?.id !== user.id && (
-                            <Button variant="destructive" size="icon" onClick={() => handleDelete(user.id, user.nama_lengkap)}><IconTrash className="h-4 w-4" /></Button>
-                        )}
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><IconDotsVertical className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleOpenFormDialog(user)}>
+                              <IconEdit className="h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            {pb.authStore.model?.id !== user.id && (
+                              <DropdownMenuItem variant="destructive" onClick={() => handleDelete(user.id, user.nama_lengkap)}>
+                                <IconTrash className="h-4 w-4" /> Hapus
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))

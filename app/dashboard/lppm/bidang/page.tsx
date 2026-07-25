@@ -10,7 +10,10 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from '@/components/ui/textarea';
-import { IconBooks, IconPlus, IconEdit, IconTrash } from '@tabler/icons-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { IconBooks, IconPlus, IconEdit, IconTrash, IconDotsVertical } from '@tabler/icons-react';
 import { toast } from "sonner";
 
 interface Bidang extends RecordModel {
@@ -118,9 +121,20 @@ export default function LppmBidangManagementPage() {
                     <TableRow key={bidang.id}>
                       <TableCell className="font-medium">{bidang.nama_bidang}</TableCell>
                       <TableCell>{bidang.deskripsi}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => handleOpenDialog(bidang)}><IconEdit className="h-4 w-4" /></Button>
-                        <Button variant="destructive" size="icon" onClick={() => handleDelete(bidang.id, bidang.nama_bidang)}><IconTrash className="h-4 w-4" /></Button>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><IconDotsVertical className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleOpenDialog(bidang)}>
+                              <IconEdit className="h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem variant="destructive" onClick={() => handleDelete(bidang.id, bidang.nama_bidang)}>
+                              <IconTrash className="h-4 w-4" /> Hapus
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))

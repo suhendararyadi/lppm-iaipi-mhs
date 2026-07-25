@@ -11,7 +11,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { IconFileText, IconEye, IconPencil, IconTrash, IconDownload } from '@tabler/icons-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { IconFileText, IconEye, IconPencil, IconTrash, IconDownload, IconDotsVertical } from '@tabler/icons-react';
 import { toast } from "sonner";
 
 interface Anggota {
@@ -225,10 +228,27 @@ export default function LaporanListPage() {
                       <TableCell>{laporan.expand?.bidang_penelitian?.nama_bidang || '-'}</TableCell>
                       <TableCell>{new Date(laporan.tanggal_kegiatan).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</TableCell>
                       <TableCell><Badge variant={getStatusBadgeVariant(laporan.status)}>{laporan.status}</Badge></TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}`}><Button variant="outline" size="icon"><IconEye className="h-4 w-4" /></Button></Link>
-                        <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}/edit`}><Button variant="outline" size="icon"><IconPencil className="h-4 w-4" /></Button></Link>
-                        <Button variant="destructive" size="icon" onClick={() => handleDelete(laporan.id, laporan.judul_kegiatan)}><IconTrash className="h-4 w-4" /></Button>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><IconDotsVertical className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}`}>
+                                <IconEye className="h-4 w-4" /> Lihat
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/mahasiswa/laporan/${laporan.id}/edit`}>
+                                <IconPencil className="h-4 w-4" /> Edit
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem variant="destructive" onClick={() => handleDelete(laporan.id, laporan.judul_kegiatan)}>
+                              <IconTrash className="h-4 w-4" /> Hapus
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))

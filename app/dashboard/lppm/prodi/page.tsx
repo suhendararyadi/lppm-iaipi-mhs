@@ -9,7 +9,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { IconSchool, IconPlus, IconEdit, IconTrash } from '@tabler/icons-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { IconSchool, IconPlus, IconEdit, IconTrash, IconDotsVertical } from '@tabler/icons-react';
 import { toast } from "sonner";
 
 interface Prodi extends RecordModel {
@@ -125,9 +128,20 @@ export default function LppmProdiManagementPage() {
                     <TableRow key={prodi.id}>
                       <TableCell className="font-medium">{prodi.nama_prodi}</TableCell>
                       <TableCell>{prodi.kode_prodi || '-'}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="outline" size="icon" onClick={() => handleOpenDialog(prodi)}><IconEdit className="h-4 w-4" /></Button>
-                        <Button variant="destructive" size="icon" onClick={() => handleDelete(prodi.id, prodi.nama_prodi)}><IconTrash className="h-4 w-4" /></Button>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><IconDotsVertical className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleOpenDialog(prodi)}>
+                              <IconEdit className="h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem variant="destructive" onClick={() => handleDelete(prodi.id, prodi.nama_prodi)}>
+                              <IconTrash className="h-4 w-4" /> Hapus
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
