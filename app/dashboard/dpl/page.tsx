@@ -42,7 +42,9 @@ export default function DplDashboardPage() {
     setIsLoading(true);
     try {
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
-          filter: `kelompok.dpl.id = "${user.id}"`,
+          // Hanya laporan di sesi/periode aktif — sesi yang sudah diarsipkan tidak boleh
+          // menumpuk di dasbor DPL, meski DPL yang sama membimbing lagi di sesi baru.
+          filter: `kelompok.dpl.id = "${user.id}" && kelompok.periode.status = "aktif"`,
           sort: '-updated',
           expand: 'kelompok.ketua',
           signal,

@@ -41,7 +41,9 @@ export default function DplRiwayatVerifikasiPage() {
     setIsLoading(true);
     try {
       const laporanList = await pb.collection('laporans').getFullList<LaporanRiwayat>({
-          filter: `kelompok.dpl.id = "${user.id}" && (status = "Disetujui" || status = "Revisi")`,
+          // Hanya laporan di sesi/periode aktif — riwayat sesi yang sudah diarsipkan
+          // tidak ditampilkan lagi di sini meski DPL yang sama membimbing lagi di sesi baru.
+          filter: `kelompok.dpl.id = "${user.id}" && (status = "Disetujui" || status = "Revisi") && kelompok.periode.status = "aktif"`,
           sort: '-updated',
           expand: 'kelompok.ketua',
           signal,

@@ -41,7 +41,9 @@ export default function DplLaporanListPage() {
     setIsLoading(true);
     try {
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
-          filter: `kelompok.dpl.id = "${user.id}"`,
+          // Hanya laporan di sesi/periode aktif — supaya laporan dari sesi yang sudah
+          // diarsipkan tidak menumpuk meski DPL yang sama membimbing lagi di sesi baru.
+          filter: `kelompok.dpl.id = "${user.id}" && kelompok.periode.status = "aktif"`,
           sort: '-updated',
           // Diperbaiki: Memuat relasi kelompok dan ketua di dalamnya
           expand: 'kelompok,kelompok.ketua',

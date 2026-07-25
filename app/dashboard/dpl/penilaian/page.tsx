@@ -75,7 +75,9 @@ export default function PenilaianPage() {
 
         setIsLoading(true);
         try {
-            const filter = `dpl.id = "${user.id}"`;
+            // Hanya kelompok bimbingan di sesi/periode aktif — kelompok dari sesi yang
+            // sudah diarsipkan tidak menumpuk di dropdown meski DPL yang sama membimbing lagi.
+            const filter = `dpl.id = "${user.id}" && periode.status = "aktif"`;
             const data = await pb.collection('kelompok_mahasiswa').getFullList<KelompokBimbingan>({
                 filter: filter,
                 expand: 'ketua,ketua.prodi',
