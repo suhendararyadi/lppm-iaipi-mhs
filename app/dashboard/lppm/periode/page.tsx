@@ -73,18 +73,43 @@ export default function LppmPeriodePage() {
     }
     setIsSubmitting(true);
     try {
+      const oldPeriodeId = activePeriode?.id;
       if (activePeriode) {
         await pb.collection("periode").update(activePeriode.id, { status: "arsip" });
       }
-      await pb.collection("periode").create({
+      const newPeriode = await pb.collection("periode").create({
         nama: nama.trim(),
         tahun_akademik: tahunAkademik.trim(),
         semester,
         status: "aktif",
       });
+
+      // Lanjutkan kelompok mahasiswa yang ketuanya masih aktif ke sesi baru — tanpa ini,
+      // kelompok lama tetap terkunci di sesi arsip dan mahasiswa kehilangan akses CRUD
+      // (anggota/laporan) sampai LPPM membuat ulang kelompoknya secara manual.
+      let migratedCount = 0;
+      if (oldPeriodeId) {
+        const oldKelompokList = await pb.collection("kelompok_mahasiswa").getFullList({
+          filter: `periode = "${oldPeriodeId}"`,
+          expand: "ketua",
+        });
+        for (const k of oldKelompokList) {
+          if (k.expand?.ketua?.status !== "aktif") continue;
+          await pb.collection("kelompok_mahasiswa").create({
+            ketua: k.ketua,
+            dpl: k.dpl,
+            anggota: k.anggota ?? [],
+            periode: newPeriode.id,
+            ketua_nama: k.ketua_nama,
+            dpl_nama: k.dpl_nama,
+          });
+          migratedCount++;
+        }
+      }
+
       toast.success(
         activePeriode
-          ? `Sesi "${activePeriode.nama}" diarsipkan. Sesi baru sudah aktif.`
+          ? `Sesi "${activePeriode.nama}" diarsipkan. Sesi baru aktif — ${migratedCount} kelompok mahasiswa aktif dilanjutkan otomatis.`
           : "Sesi baru berhasil diaktifkan."
       );
       setIsDialogOpen(false);
