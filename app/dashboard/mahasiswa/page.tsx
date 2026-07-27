@@ -38,7 +38,10 @@ export default function MahasiswaDashboardPage() {
     try {
       // Disesuaikan: Logika pembuatan kelompok otomatis dihapus.
       // Sekarang hanya mencoba mengambil data kelompok yang sudah ada.
-      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal, expand: 'periode' });
+      // Filter periode.status="aktif" wajib — mahasiswa yang lanjut lintas sesi kini punya
+      // lebih dari satu record kelompok (lama + baru), tanpa filter ini bisa saja yang
+      // ke-ambil malah kelompok lama yang sudah diarsipkan.
+      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}" && periode.status="aktif"`, { signal, expand: 'periode' });
       setIsPeriodeArsip(kelompokRecord.expand?.periode?.status === 'arsip');
 
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({

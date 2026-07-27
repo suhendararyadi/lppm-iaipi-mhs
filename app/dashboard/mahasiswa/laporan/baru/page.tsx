@@ -54,7 +54,10 @@ export default function BuatLaporanPage() {
     try {
       const [bidangList, kelompokData] = await Promise.all([
         pb.collection('bidang_penelitian').getFullList<BidangPenelitian>({ sort: 'nama_bidang', signal }),
-        pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'periode' })
+        // Filter periode.status="aktif" wajib — mahasiswa yang lanjut lintas sesi kini punya
+        // lebih dari satu record kelompok (lama + baru), tanpa filter ini bisa saja yang
+        // ke-ambil malah kelompok lama yang sudah diarsipkan.
+        pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}" && periode.status="aktif"`, { signal, expand: 'periode' })
       ]);
 
       setBidangPenelitian(bidangList);

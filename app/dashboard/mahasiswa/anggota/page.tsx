@@ -48,7 +48,10 @@ export default function KelolaAnggotaPage() {
     }
     try {
       const [kelompokRecord, prodiData] = await Promise.all([
-        pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}"`, { signal, expand: 'periode' }),
+        // Filter periode.status="aktif" wajib — mahasiswa yang lanjut lintas sesi kini punya
+        // lebih dari satu record kelompok (lama + baru), tanpa filter ini bisa saja yang
+        // ke-ambil malah kelompok lama yang sudah diarsipkan.
+        pb.collection('kelompok_mahasiswa').getFirstListItem(`ketua.id="${user.id}" && periode.status="aktif"`, { signal, expand: 'periode' }),
         pb.collection('program_studi').getFullList<Prodi>({ sort: 'nama_prodi', signal })
       ]);
       

@@ -55,6 +55,13 @@ interface Laporan extends RecordModel {
     expand?: {
         bidang_penelitian: {
             nama_bidang: string;
+        },
+        kelompok?: {
+            expand?: {
+                periode?: {
+                    status: 'aktif' | 'arsip';
+                }
+            }
         }
     }
 }
@@ -73,14 +80,25 @@ export default function LaporanListPage() {
     }
     setIsLoading(true);
     try {
-      // Diperbarui: Menambahkan expand untuk prodi ketua & periode (cek status arsip)
-      const kelompokRecord = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'ketua,dpl,ketua.prodi,periode' });
-      setKelompok(kelompokRecord);
-      
+      // Mahasiswa yang lanjut lintas sesi kini bisa punya lebih dari satu record kelompok
+      // (lama + baru) — ambil semuanya supaya riwayat laporan dari sesi lama tetap terlihat,
+      // lalu pakai kelompok yang periodenya aktif untuk header rekap & tombol "Buat Laporan Baru".
+      const kelompokList = await pb.collection('kelompok_mahasiswa').getFullList<Kelompok>({
+          filter: `ketua.id="${user.id}"`,
+          expand: 'ketua,dpl,ketua.prodi,periode',
+          signal,
+      });
+      if (kelompokList.length === 0) {
+        throw new Error('Kelompok tidak ditemukan');
+      }
+      const kelompokAktif = kelompokList.find(k => k.expand?.periode?.status === 'aktif') ?? null;
+      setKelompok(kelompokAktif ?? kelompokList[0]);
+
+      const kelompokIdFilter = kelompokList.map(k => `kelompok.id="${k.id}"`).join(' || ');
       const laporanList = await pb.collection('laporans').getFullList<Laporan>({
-          filter: `kelompok.id="${kelompokRecord.id}"`,
+          filter: kelompokIdFilter,
           sort: '-tanggal_kegiatan',
-          expand: 'bidang_penelitian',
+          expand: 'bidang_penelitian,kelompok.periode',
           signal: signal,
       });
       setLaporans(laporanList);
@@ -182,7 +200,12 @@ export default function LaporanListPage() {
     toast.success("Dokumen berhasil diunduh!");
   };
 
-  const isPeriodeArsip = kelompok?.expand?.periode?.status === 'arsip';
+  // Dipakai untuk tombol "Buat Laporan Baru" — sesi yang sedang aktif untuk mahasiswa ini.
+  const isPeriodeArsip = !kelompok || kelompok.expand?.periode?.status === 'arsip';
+  // Status arsip per-laporan — karena daftar ini sekarang bisa berisi laporan dari sesi lama
+  // DAN sesi baru sekaligus, kuncinya harus dicek per baris lewat kelompok masing-masing laporan,
+  // bukan satu flag global seperti sebelumnya.
+  const isLaporanArsip = (laporan: Laporan) => laporan.expand?.kelompok?.expand?.periode?.status === 'arsip';
 
   const getStatusBadgeVariant = (status: Laporan['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
@@ -231,7 +254,9 @@ export default function LaporanListPage() {
                 {isLoading ? (
                     <TableRow><TableCell colSpan={5} className="text-center h-24">Memuat laporan...</TableCell></TableRow>
                 ) : laporans.length > 0 ? (
-                  laporans.map((laporan) => (
+                  laporans.map((laporan) => {
+                    const arsip = isLaporanArsip(laporan);
+                    return (
                     <TableRow key={laporan.id}>
                       <TableCell className="font-medium">{laporan.judul_kegiatan}</TableCell>
                       <TableCell>{laporan.expand?.bidang_penelitian?.nama_bidang || '-'}</TableCell>
@@ -248,7 +273,7 @@ export default function LaporanListPage() {
                                 <IconEye className="h-4 w-4" /> Lihat
                               </Link>
                             </DropdownMenuItem>
-                            {isPeriodeArsip ? (
+                            {arsip ? (
                               <DropdownMenuItem disabled title="Sesi sudah diarsipkan">
                                 <IconPencil className="h-4 w-4" /> Edit
                               </DropdownMenuItem>
@@ -261,8 +286,8 @@ export default function LaporanListPage() {
                             )}
                             <DropdownMenuItem
                               variant="destructive"
-                              disabled={isPeriodeArsip}
-                              title={isPeriodeArsip ? "Sesi sudah diarsipkan" : undefined}
+                              disabled={arsip}
+                              title={arsip ? "Sesi sudah diarsipkan" : undefined}
                               onClick={() => handleDelete(laporan.id, laporan.judul_kegiatan)}
                             >
                               <IconTrash className="h-4 w-4" /> Hapus
@@ -271,7 +296,7 @@ export default function LaporanListPage() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                  );})
                 ) : (
                   <TableRow><TableCell colSpan={5} className="text-center h-24">Belum ada laporan yang dibuat.</TableCell></TableRow>
                 )}

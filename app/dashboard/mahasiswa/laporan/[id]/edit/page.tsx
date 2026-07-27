@@ -36,6 +36,10 @@ interface Kelompok {
 }
 interface Laporan extends RecordModel {
     mahasiswa_terlibat: string[];
+    kelompok: string;
+    expand?: {
+        kelompok?: Kelompok;
+    }
 }
 
 export default function EditLaporanPage() {
@@ -59,18 +63,18 @@ export default function EditLaporanPage() {
     }
 
     try {
-      // Ambil data laporan yang akan diedit
-      const laporanData = await pb.collection('laporans').getOne<Laporan>(laporanId, { signal });
+      // Ambil data laporan yang akan diedit — kelompok & periode diambil lewat relasi
+      // laporan itu sendiri (bukan query terpisah berdasar ketua.id), supaya status arsip
+      // yang dicek selalu milik kelompok yang menaungi laporan ini, bukan kelompok aktif
+      // hari ini (mahasiswa yang lanjut lintas sesi bisa punya lebih dari satu kelompok).
+      const laporanData = await pb.collection('laporans').getOne<Laporan>(laporanId, { signal, expand: 'kelompok.periode' });
       setLaporan(laporanData);
       setMahasiswaTerlibat(laporanData.mahasiswa_terlibat || []);
+      setKelompok(laporanData.expand?.kelompok ?? null);
 
       // Ambil daftar bidang penelitian
       const bidangList = await pb.collection('bidang_penelitian').getFullList<BidangPenelitian>({ sort: 'nama_bidang', signal });
       setBidangPenelitian(bidangList);
-
-      // Ambil data kelompok mahasiswa (+ periode untuk cek status arsip)
-      const kelompokData = await pb.collection('kelompok_mahasiswa').getFirstListItem<Kelompok>(`ketua.id="${user.id}"`, { signal, expand: 'periode' });
-      setKelompok(kelompokData);
 
     } catch (error) {
         if (!(error instanceof ClientResponseError && error.isAbort)) {
