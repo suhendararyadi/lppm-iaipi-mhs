@@ -94,7 +94,7 @@ export default function BuatLaporanPage() {
   // Diperbarui: Fungsi untuk menangani "Ceklis Semua"
   const handleSelectAllChange = (checked: boolean | 'indeterminate') => {
     if (checked === true) {
-      const allMemberNames = kelompok?.anggota.map(a => a.nama) || [];
+      const allMemberNames = (kelompok?.anggota ?? []).map(a => a.nama);
       setMahasiswaTerlibat(allMemberNames);
     } else {
       setMahasiswaTerlibat([]);
@@ -221,7 +221,7 @@ export default function BuatLaporanPage() {
                         <Checkbox
                             id="select-all-anggota"
                             checked={
-                                kelompok?.anggota.length ? mahasiswaTerlibat.length === kelompok?.anggota.length : false
+                                (kelompok?.anggota?.length ?? 0) > 0 ? mahasiswaTerlibat.length === kelompok?.anggota?.length : false
                             }
                             onCheckedChange={handleSelectAllChange}
                         />
@@ -230,7 +230,7 @@ export default function BuatLaporanPage() {
                         </Label>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                        {kelompok?.anggota.map((anggota, index) => (
+                        {(kelompok?.anggota ?? []).map((anggota, index) => (
                            <div key={index} className="flex items-center gap-2">
                              <Checkbox 
                                 id={`anggota-${index}`}

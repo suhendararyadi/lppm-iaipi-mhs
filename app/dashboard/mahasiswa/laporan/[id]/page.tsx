@@ -214,7 +214,7 @@ export default function DetailLaporanPage() {
             <div className="space-y-2"><h3 className="font-semibold">Rencana Tindak Lanjut</h3><p className="text-muted-foreground pl-4">{laporan.rencana_tindak_lanjut || '-'}</p></div>
             <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2"><h3 className="font-semibold">Mahasiswa Terlibat</h3><ul className="list-disc list-inside text-muted-foreground pl-4">{laporan.mahasiswa_terlibat.map((nama, i) => <li key={i}>{nama}</li>)}</ul></div>
-                <div className="space-y-2"><h3 className="font-semibold">Anggota Kelompok</h3><ul className="list-disc list-inside text-muted-foreground pl-4">{laporan.expand?.kelompok?.anggota.map((a, i) => <li key={i}>{a.nama} ({a.nim}) - {a.prodiNama}</li>)}</ul></div>
+                <div className="space-y-2"><h3 className="font-semibold">Anggota Kelompok</h3><ul className="list-disc list-inside text-muted-foreground pl-4">{(laporan.expand?.kelompok?.anggota ?? []).map((a, i) => <li key={i}>{a.nama} ({a.nim}) - {a.prodiNama}</li>)}</ul></div>
             </div>
             {laporan.dokumen_pendukung && laporan.dokumen_pendukung.length > 0 && (
                 <div className="space-y-2">

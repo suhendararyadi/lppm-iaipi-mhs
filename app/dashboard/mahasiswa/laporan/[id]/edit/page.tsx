@@ -202,7 +202,7 @@ export default function EditLaporanPage() {
                  <div>
                   <Label>Mahasiswa yang Terlibat</Label>
                   <div className="p-3 border rounded-md grid grid-cols-2 gap-2">
-                    {kelompok?.anggota.map((anggota, index) => (
+                    {(kelompok?.anggota ?? []).map((anggota, index) => (
                        <div key={index} className="flex items-center gap-2">
                          <Checkbox 
                             id={`anggota-${index}`} 
